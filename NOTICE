@@ -1,0 +1,61 @@
+Fournine Cloud Analyzer
+Copyright (c) 2024-present Fournine Cloud
+
+Licensed under the Apache License, Version 2.0
+
+This product includes software developed by third parties under the following
+licenses. These dependencies are used as unmodified libraries.
+
+================================================================================
+
+AWS SDK for JavaScript v3
+Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+Licensed under the Apache License, Version 2.0
+https://github.com/aws/aws-sdk-js-v3
+
+================================================================================
+
+Google Cloud Client Libraries for Node.js
+Copyright Google LLC
+Licensed under the Apache License, Version 2.0
+https://github.com/googleapis/google-cloud-node
+
+================================================================================
+
+googleapis (Google APIs Node.js Client)
+Copyright Google LLC
+Licensed under the Apache License, Version 2.0
+https://github.com/googleapis/google-api-nodejs-client
+
+================================================================================
+
+elkjs (Eclipse Layout Kernel for JavaScript)
+Copyright (c) Kiel University and others
+Licensed under the Eclipse Public License 2.0 (EPL-2.0)
+https://github.com/kieler/elkjs
+
+Used as an unmodified library dependency for graph layout. EPL-2.0 permits
+usage as a library without imposing copyleft obligations on the surrounding
+application.
+
+================================================================================
+
+jszip (via exceljs)
+Copyright (c) Stuart Knightley, David Duponchel, Franz Buchinger, Antonio Afonso
+Dual-licensed under MIT OR GPL-3.0-or-later
+This project uses jszip under the MIT license.
+https://github.com/Stuk/jszip
+
+================================================================================
+
+node-forge (via Google Cloud auth chain)
+Copyright (c) Digital Bazaar, Inc.
+Dual-licensed under BSD-3-Clause OR GPL-2.0
+This project uses node-forge under the BSD-3-Clause license.
+https://github.com/digitalbazaar/forge
+
+================================================================================
+
+License references:
+Apache License, Version 2.0: https://www.apache.org/licenses/LICENSE-2.0
+Eclipse Public License 2.0: https://www.eclipse.org/legal/epl-2.0/
