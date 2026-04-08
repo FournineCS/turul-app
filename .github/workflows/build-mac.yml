@@ -148,7 +148,7 @@ jobs:
           VERSION="${{ steps.version.outputs.version }}"
           dmg=$(find "artifacts/mac-arm64" -name "*.dmg" | head -1)
           if [ -n "$dmg" ]; then
-            cp "$dmg" "release-assets/FournineCloudAnalyzer-${VERSION}-mac-arm64.dmg"
+            cp "$dmg" "release-assets/Turul-${VERSION}-mac-arm64.dmg"
           fi
           ls -lh release-assets/
 

@@ -39,8 +39,8 @@ Turul is a desktop application for scanning, analyzing, and reporting on AWS and
 
 Download the appropriate installer for your operating system from the GitHub Releases page:
 
-- **macOS**: `FournineCloud-{version}-mac-x64.dmg` (Intel) or `FournineCloud-{version}-mac-arm64.dmg` (Apple Silicon)
-- **Linux**: `FournineCloud-{version}-linux-x64.zip` or `FournineCloud-{version}-linux-arm64.zip`
+- **macOS**: `Turul-{version}-mac-x64.dmg` (Intel) or `Turul-{version}-mac-arm64.dmg` (Apple Silicon)
+- **Linux**: `Turul-{version}-linux-x64.zip` or `Turul-{version}-linux-arm64.zip`
 
 On macOS, open the `.dmg` file and drag the app to your Applications folder. On first launch, macOS Gatekeeper may show a security warning because the app is ad-hoc signed. Right-click the app icon and choose **Open** to bypass this prompt the first time.
 
