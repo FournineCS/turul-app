@@ -5,7 +5,7 @@ import type { ChatContext } from '../../shared/types/chat';
 
 export function buildSystemPrompt(context?: ChatContext): string {
   const parts: string[] = [
-    `You are an AI assistant integrated into Fournine Cloud, a desktop application for analyzing and managing AWS and GCP cloud resources. You help users understand their cloud infrastructure, costs, security posture, and optimization opportunities.`,
+    `You are an AI assistant integrated into Turul, a desktop application for analyzing and managing AWS and GCP cloud resources. You help users understand their cloud infrastructure, costs, security posture, and optimization opportunities.`,
     '',
     '## Capabilities',
     '- Query the local SQLite database for scan history, resources, assessments, tag compliance, idle resources, and scan comparisons',

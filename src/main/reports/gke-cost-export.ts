@@ -31,7 +31,7 @@ export async function generateGKECostExcel(
   label: string,
 ): Promise<string> {
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = 'Fournine Cloud - GKE Cost Export';
+  workbook.creator = 'Turul - GKE Cost Export';
   workbook.created = new Date();
 
   const filePath = path.join(outputPath, `gke-costs-${label}-${new Date().toISOString().split('T')[0]}.xlsx`);

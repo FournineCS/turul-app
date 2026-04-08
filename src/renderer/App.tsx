@@ -341,8 +341,8 @@ const AppContent: React.FC = () => {
           <div className="sidebar-logo">
             <CloudIcon />
             <div>
-              <span>Fournine Cloud</span>
-              <div className="sidebar-subtitle">Your DevOps Partner</div>
+              <span>Turul</span>
+              <div className="sidebar-subtitle">Cloud Resource Analyzer</div>
             </div>
           </div>
         </div>

@@ -150,7 +150,7 @@ function drawCoverPage(
   const footerY = doc.page.height - 52;
   doc.rect(0, footerY, pageW, 52).fill('#f1f5f9');
   doc.moveTo(0, footerY).lineTo(pageW, footerY).strokeColor(COLORS.accent).lineWidth(2).stroke();
-  const genLine = `Prepared by Fournine Cloud Analyzer  ·  Generated ${new Date().toLocaleDateString('en-US', {
+  const genLine = `Prepared by Turul  ·  Generated ${new Date().toLocaleDateString('en-US', {
     year: 'numeric', month: 'long', day: 'numeric',
   })}  ·  CONFIDENTIAL`;
   doc.fontSize(8).fillColor(COLORS.textLight);
@@ -177,7 +177,7 @@ export async function generateOptimizationPdf(
         margins: { top: 45, bottom: 50, left: 50, right: 50 },
         info: {
           Title:   `GCP Optimization Report — ${label}`,
-          Author:  'Fournine Cloud Analyzer',
+          Author:  'Turul',
           Subject: 'GCP Cost Optimization',
         },
       });

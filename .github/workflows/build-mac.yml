@@ -159,7 +159,7 @@ jobs:
           TAG: ${{ steps.version.outputs.tag }}
         run: |
           gh release create "$TAG" \
-            --title "Fournine Cloud Analyzer ${VERSION}" \
+            --title "Turul ${VERSION}" \
             --generate-notes \
             --latest \
             release-assets/*

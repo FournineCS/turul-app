@@ -64,8 +64,8 @@ const LoginPage: React.FC = () => {
         <div className="auth-logo">
           <CloudIcon />
           <div>
-            <div className="auth-logo-text">Fournine Cloud</div>
-            <div className="auth-logo-subtitle">Your DevOps Partner</div>
+            <div className="auth-logo-text">Turul</div>
+            <div className="auth-logo-subtitle">Cloud Resource Analyzer</div>
           </div>
         </div>
         <div className="auth-title">Welcome Back</div>

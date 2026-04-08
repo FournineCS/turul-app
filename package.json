@@ -232,8 +232,8 @@
     "wait-on": "^7.2.0"
   },
   "build": {
-    "appId": "com.fourninecloud.cloud-analyzer",
-    "productName": "Fournine Cloud Analyzer",
+    "appId": "com.fourninecloud.turul",
+    "productName": "Turul",
     "directories": {
       "output": "release"
     },

@@ -1,4 +1,4 @@
-# Fournine Cloud Analyzer - Development Notes
+# Turul - Development Notes
 
 ## Running the App
 

@@ -37,7 +37,7 @@ export async function generateOptimizationExcel(
   label: string,
 ): Promise<string> {
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = 'Fournine Cloud - Optimization Export';
+  workbook.creator = 'Turul - Optimization Export';
   workbook.created = new Date();
 
   const filePath = path.join(outputPath, `gcp-optimization-${label}-${new Date().toISOString().split('T')[0]}.xlsx`);

@@ -179,7 +179,7 @@ function drawCoverPage(doc: PDFKit.PDFDocument, analysis: CostAnalysisResult, la
   const footerY = doc.page.height - 52;
   doc.rect(0, footerY, pageW, 52).fill('#f1f5f9');
   doc.moveTo(0, footerY).lineTo(pageW, footerY).strokeColor(COLORS.accent).lineWidth(2).stroke();
-  const genLine = `Prepared by Fournine Cloud Analyzer  ·  Generated ${new Date().toLocaleDateString('en-US', {
+  const genLine = `Prepared by Turul  ·  Generated ${new Date().toLocaleDateString('en-US', {
     year: 'numeric', month: 'long', day: 'numeric',
   })}  ·  CONFIDENTIAL`;
   doc.fontSize(8).fillColor(COLORS.textLight);
@@ -204,7 +204,7 @@ export async function generateCostPdf(
         margins: { top: 45, bottom: 50, left: 50, right: 50 },
         info: {
           Title:   `Cloud Cost Analysis — ${label}`,
-          Author:  'Fournine Cloud Analyzer',
+          Author:  'Turul',
           Subject: `Cost Report ${analysis.startDate} to ${analysis.endDate}`,
         },
       });

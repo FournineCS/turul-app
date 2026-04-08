@@ -74,7 +74,7 @@ export class BiometricService {
 
     // Gate: require Touch ID verification
     try {
-      await systemPreferences.promptTouchID('Unlock Fournine Cloud');
+      await systemPreferences.promptTouchID('Unlock Turul');
     } catch {
       throw new Error('Touch ID authentication was cancelled or failed');
     }

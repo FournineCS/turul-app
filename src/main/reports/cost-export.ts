@@ -40,7 +40,7 @@ export async function generateCostExcel(
   label: string
 ): Promise<string> {
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = 'Fournine Cloud - Cost Analyzer';
+  workbook.creator = 'Turul - Cost Analyzer';
   workbook.created = new Date();
 
   const filePath = path.join(outputPath, `cost-export-${label}-${new Date().toISOString().split('T')[0]}.xlsx`);

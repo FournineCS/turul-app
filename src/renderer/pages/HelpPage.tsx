@@ -764,7 +764,7 @@ const HelpPage: React.FC = () => {
           )}
 
           <div className="help-footer">
-            <p>Fournine Cloud Analyzer &mdash; Your DevOps Partner</p>
+            <p>Turul &mdash; Cloud Resource Analyzer</p>
             <p className="text-secondary text-sm">
               For additional support, report issues at the project's GitHub repository.
             </p>

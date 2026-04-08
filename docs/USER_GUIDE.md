@@ -1,6 +1,6 @@
-# Fournine Cloud Analyzer - User Guide
+# Turul - User Guide
 
-Fournine Cloud Analyzer is a desktop application for scanning, analyzing, and reporting on AWS and GCP cloud resources. It runs entirely on your machine — all credentials, scan data, and results are stored locally in an encrypted SQLite database.
+Turul is a desktop application for scanning, analyzing, and reporting on AWS and GCP cloud resources. It runs entirely on your machine — all credentials, scan data, and results are stored locally in an encrypted SQLite database.
 
 ---
 
@@ -229,7 +229,7 @@ Clicking **Switch Account** effectively logs you out. The app clears the project
 
 ## 6. Switching Between AWS and GCP
 
-The **AWS / GCP** toggle is located at the top of the sidebar, below the Fournine Cloud logo.
+The **AWS / GCP** toggle is located at the top of the sidebar, below the Turul logo.
 
 - Click **AWS** to switch to AWS mode. The navigation will show all AWS-specific pages (Multi-Account, Comparison, Well-Architected, Tag Governance, IAM Analysis, Compliance, Schedules).
 - Click **GCP** to switch to GCP mode. AWS-only pages are hidden. GCP-specific pages appear: GCP Optimization, GKE Costs.
