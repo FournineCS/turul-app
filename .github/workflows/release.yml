@@ -71,7 +71,7 @@ jobs:
           - arch: arm64
             runner: macos-latest       # Apple Silicon
           - arch: x64
-            runner: macos-13           # Intel
+            runner: macos-15-intel   # Intel (macos-13 retired Dec 2025)
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
