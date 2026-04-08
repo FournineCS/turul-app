@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Build Electron app for all 4 targets from macOS ARM64
-# Outputs: .dmg (macOS), .deb (Linux)
-# Requires: Node.js 22+, Docker (for Linux builds)
+# Build Electron app for all targets from macOS ARM64
+# Outputs: .dmg (macOS), .exe (Windows), .AppImage/.deb (Linux)
+# Requires: Node.js 22+, Docker (for Linux builds), Wine (for Windows builds)
 set -euo pipefail
 
 export NODE_OPTIONS='--max-old-space-size=8192'
@@ -18,7 +18,7 @@ warn() { echo -e "${YELLOW}[warn]${NC}  $*"; }
 fail() { echo -e "${RED}[error]${NC} $*"; exit 1; }
 
 # Parse flags
-TARGETS=("mac-arm64" "mac-x64" "linux-x64" "linux-arm64")
+TARGETS=("mac-arm64" "mac-x64" "win-x64" "win-arm64" "linux-x64" "linux-arm64")
 if [ $# -gt 0 ]; then
   TARGETS=("$@")
 fi
@@ -52,16 +52,24 @@ for target in "${TARGETS[@]}"; do
       log "Packaging macOS x64 (.dmg)..."
       npx electron-builder --mac dmg --x64 --publish never
       ;;
+    win-x64)
+      log "Packaging Windows x64 (.exe)..."
+      npx electron-builder --win nsis --x64 --publish never
+      ;;
+    win-arm64)
+      log "Packaging Windows arm64 (.exe)..."
+      npx electron-builder --win nsis --arm64 --publish never
+      ;;
     linux-x64)
-      log "Packaging Linux x64 (.deb)..."
-      npx electron-builder --linux deb --x64 --publish never
+      log "Packaging Linux x64 (.AppImage, .deb)..."
+      npx electron-builder --linux AppImage deb --x64 --publish never
       ;;
     linux-arm64)
-      log "Packaging Linux arm64 (.deb)..."
-      npx electron-builder --linux deb --arm64 --publish never
+      log "Packaging Linux arm64 (.AppImage, .deb)..."
+      npx electron-builder --linux AppImage deb --arm64 --publish never
       ;;
     *)
-      warn "Unknown target '$target' — skipping. Valid: mac-arm64 mac-x64 linux-x64 linux-arm64"
+      warn "Unknown target '$target' — skipping. Valid: mac-arm64 mac-x64 win-x64 win-arm64 linux-x64 linux-arm64"
       ;;
   esac
 done
@@ -69,7 +77,7 @@ done
 # Summary
 echo ""
 log "Build complete. Artifacts:"
-find release -maxdepth 2 \( -name "*.dmg" -o -name "*.deb" \) | sort | while read -r f; do
+find release -maxdepth 2 \( -name "*.dmg" -o -name "*.exe" -o -name "*.AppImage" -o -name "*.deb" \) | sort | while read -r f; do
   size=$(du -sh "$f" | cut -f1)
   echo "  ${size}  $f"
 done

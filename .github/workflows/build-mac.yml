@@ -7,7 +7,6 @@ on:
   workflow_dispatch:
 
 jobs:
-  # Only run when a PR is merged (not just closed)
   check-merge:
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
@@ -60,9 +59,20 @@ jobs:
       - name: npm audit
         run: npm audit --omit=dev --audit-level=high
 
+  # ──────────────────────────────────────────────
+  # macOS — native builds on matching runners
+  # ──────────────────────────────────────────────
   build-mac:
-    runs-on: [self-hosted, macOS, arm64]
     needs: security-scan
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-latest       # Apple Silicon
+          - arch: x64
+            runner: macos-13           # Intel
+    runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -83,13 +93,13 @@ jobs:
         env:
           NODE_OPTIONS: '--max-old-space-size=8192'
 
-      - name: Package for macOS (arm64)
-        run: npx electron-builder --mac --arm64 --publish never
+      - name: Package for macOS (${{ matrix.arch }})
+        run: npx electron-builder --mac --${{ matrix.arch }} --publish never
         env:
           NODE_OPTIONS: '--max-old-space-size=8192'
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
-      - name: Ad-hoc codesign (prevents Gatekeeper damaged error)
+      - name: Ad-hoc codesign
         run: |
           APP_PATH=$(find release/mac* -name "*.app" -maxdepth 1 2>/dev/null | head -1)
           if [ -n "$APP_PATH" ]; then
@@ -105,7 +115,7 @@ jobs:
           rm -f release/*.dmg
           APP_DIR=$(find release -type d -name "mac*" | head -1)
           if [ -n "$APP_DIR" ]; then
-            npx electron-builder --mac --arm64 --publish never --prepackaged "$APP_DIR"
+            npx electron-builder --mac --${{ matrix.arch }} --publish never --prepackaged "$APP_DIR"
           fi
         env:
           NODE_OPTIONS: '--max-old-space-size=8192'
@@ -114,13 +124,108 @@ jobs:
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
         with:
-          name: mac-arm64
+          name: mac-${{ matrix.arch }}
           path: release/*.dmg
           if-no-files-found: error
 
+  # ──────────────────────────────────────────────
+  # Windows — x64 native, arm64 cross-compiled
+  # ──────────────────────────────────────────────
+  build-windows:
+    needs: security-scan
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64, arm64]
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+        env:
+          NODE_OPTIONS: '--max-old-space-size=8192'
+
+      - name: Build
+        run: npm run build
+        env:
+          NODE_OPTIONS: '--max-old-space-size=8192'
+
+      - name: Package for Windows (${{ matrix.arch }})
+        run: npx electron-builder --win --${{ matrix.arch }} --publish never
+        env:
+          NODE_OPTIONS: '--max-old-space-size=8192'
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: win-${{ matrix.arch }}
+          path: release/*.exe
+          if-no-files-found: error
+
+  # ──────────────────────────────────────────────
+  # Linux — x64 native, arm64 cross-compiled
+  # ──────────────────────────────────────────────
+  build-linux:
+    needs: security-scan
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64, arm64]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install cross-compilation toolchain (arm64)
+        if: matrix.arch == 'arm64'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+
+      - name: Install dependencies
+        run: npm ci
+        env:
+          NODE_OPTIONS: '--max-old-space-size=8192'
+
+      - name: Build
+        run: npm run build
+        env:
+          NODE_OPTIONS: '--max-old-space-size=8192'
+
+      - name: Package for Linux (${{ matrix.arch }})
+        run: npx electron-builder --linux --${{ matrix.arch }} --publish never
+        env:
+          NODE_OPTIONS: '--max-old-space-size=8192'
+
+      - name: Upload Linux artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-${{ matrix.arch }}
+          path: |
+            release/*.AppImage
+            release/*.deb
+          if-no-files-found: error
+
+  # ──────────────────────────────────────────────
+  # Create GitHub Release with all artifacts
+  # ──────────────────────────────────────────────
   create-release:
     runs-on: ubuntu-latest
-    needs: build-mac
+    needs: [build-mac, build-windows, build-linux]
     permissions:
       contents: write
     steps:
@@ -143,13 +248,40 @@ jobs:
         run: find artifacts -type f | sort
 
       - name: Rename artifacts for release
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           mkdir -p release-assets
-          VERSION="${{ steps.version.outputs.version }}"
-          dmg=$(find "artifacts/mac-arm64" -name "*.dmg" | head -1)
-          if [ -n "$dmg" ]; then
-            cp "$dmg" "release-assets/Turul-${VERSION}-mac-arm64.dmg"
-          fi
+
+          # macOS
+          for arch in arm64 x64; do
+            dmg=$(find "artifacts/mac-${arch}" -name "*.dmg" 2>/dev/null | head -1)
+            if [ -n "$dmg" ]; then
+              cp "$dmg" "release-assets/Turul-${VERSION}-mac-${arch}.dmg"
+            fi
+          done
+
+          # Windows
+          for arch in x64 arm64; do
+            exe=$(find "artifacts/win-${arch}" -name "*.exe" 2>/dev/null | head -1)
+            if [ -n "$exe" ]; then
+              cp "$exe" "release-assets/Turul-${VERSION}-win-${arch}-setup.exe"
+            fi
+          done
+
+          # Linux
+          for arch in x64 arm64; do
+            appimage=$(find "artifacts/linux-${arch}" -name "*.AppImage" 2>/dev/null | head -1)
+            if [ -n "$appimage" ]; then
+              cp "$appimage" "release-assets/Turul-${VERSION}-linux-${arch}.AppImage"
+            fi
+            deb=$(find "artifacts/linux-${arch}" -name "*.deb" 2>/dev/null | head -1)
+            if [ -n "$deb" ]; then
+              cp "$deb" "release-assets/Turul-${VERSION}-linux-${arch}.deb"
+            fi
+          done
+
+          echo "Release assets:"
           ls -lh release-assets/
 
       - name: Create GitHub Release
