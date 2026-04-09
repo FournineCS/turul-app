@@ -99,28 +99,6 @@ jobs:
           NODE_OPTIONS: '--max-old-space-size=8192'
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
-      - name: Ad-hoc codesign
-        run: |
-          APP_PATH=$(find release/mac* -name "*.app" -maxdepth 1 2>/dev/null | head -1)
-          if [ -n "$APP_PATH" ]; then
-            echo "Signing: $APP_PATH"
-            codesign --force --deep --sign - "$APP_PATH"
-            codesign --verify --verbose "$APP_PATH"
-          else
-            echo "No .app found, skipping codesign"
-          fi
-
-      - name: Rebuild DMG with signed app
-        run: |
-          rm -f release/*.dmg
-          APP_DIR=$(find release -type d -name "mac*" | head -1)
-          if [ -n "$APP_DIR" ]; then
-            npx electron-builder --mac --${{ matrix.arch }} --publish never --prepackaged "$APP_DIR"
-          fi
-        env:
-          NODE_OPTIONS: '--max-old-space-size=8192'
-          CSC_IDENTITY_AUTO_DISCOVERY: false
-
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
         with:

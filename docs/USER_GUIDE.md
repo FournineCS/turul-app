@@ -43,7 +43,13 @@ Download the appropriate installer for your operating system from the GitHub Rel
 - **Windows**: `Turul-{version}-win-x64-setup.exe` (Intel/AMD) or `Turul-{version}-win-arm64-setup.exe` (ARM)
 - **Linux**: `Turul-{version}-linux-x64.AppImage` / `.deb` or `Turul-{version}-linux-arm64.AppImage` / `.deb`
 
-On macOS, open the `.dmg` file and drag the app to your Applications folder. On first launch, macOS Gatekeeper may show a security warning because the app is ad-hoc signed. Right-click the app icon and choose **Open** to bypass this prompt the first time.
+On macOS, open the `.dmg` file and drag the app to your Applications folder. Because the app is not notarized with an Apple Developer ID, macOS Gatekeeper will block it on first launch. To fix this, open Terminal and run:
+
+```bash
+xattr -cr /Applications/Turul.app
+```
+
+Then open the app normally. You only need to do this once after installation.
 
 On Windows, run the `.exe` installer and follow the prompts. On Linux, either run the `.AppImage` directly (after `chmod +x`) or install the `.deb` package with `sudo dpkg -i`.
 
