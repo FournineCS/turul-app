@@ -8,7 +8,15 @@ try {
 } catch {
   // Graceful fallback — append common paths manually
   if (process.platform === 'darwin') {
-    const extra = '/usr/local/bin:/opt/homebrew/bin:/usr/local/sbin';
+    const home = process.env.HOME || '';
+    const extra = [
+      '/usr/local/bin',
+      '/opt/homebrew/bin',
+      '/usr/local/sbin',
+      home ? `${home}/.claude/local` : '',
+      home ? `${home}/.npm-global/bin` : '',
+      home ? `${home}/.nvm/versions/node/*/bin` : '',
+    ].filter(Boolean).join(':');
     process.env.PATH = process.env.PATH ? `${process.env.PATH}:${extra}` : extra;
   } else if (process.platform === 'win32') {
     const pf = process.env.ProgramFiles || 'C:\\Program Files';

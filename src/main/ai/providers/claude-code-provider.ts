@@ -3,9 +3,32 @@
 
 import os from 'os';
 import path from 'path';
+import fs from 'fs';
 import { spawn } from 'child_process';
 import type { AIProvider } from '../ai-provider';
 import type { AIStreamChunk, AIChatRequest, AIProviderType, ChatContext } from '../../../shared/types/chat';
+
+/** Resolve the Claude CLI binary path — check common install locations */
+function resolveClaudePath(hint?: string): string {
+  if (hint && hint !== 'claude') return hint;
+
+  const home = os.homedir();
+  const candidates = [
+    path.join(home, '.claude', 'local', 'claude'),
+    '/usr/local/bin/claude',
+    '/opt/homebrew/bin/claude',
+    path.join(home, '.npm-global', 'bin', 'claude'),
+  ];
+
+  for (const p of candidates) {
+    try {
+      if (fs.existsSync(p)) return p;
+    } catch { /* skip */ }
+  }
+
+  // Fall back to bare name (rely on PATH)
+  return 'claude';
+}
 
 /**
  * Claude Code local provider using the Claude Agent SDK.
@@ -23,7 +46,7 @@ export class ClaudeCodeProvider implements AIProvider {
   private context: ChatContext | undefined;
 
   constructor(opts: { cliPath?: string; dbPath?: string; context?: ChatContext }) {
-    this.cliPath = opts.cliPath || 'claude';
+    this.cliPath = resolveClaudePath(opts.cliPath);
     this.dbPath = opts.dbPath || '';
     this.context = opts.context;
   }
