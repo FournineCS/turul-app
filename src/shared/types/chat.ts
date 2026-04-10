@@ -1,7 +1,21 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-present Fournine Cloud
 
-export type AIProviderType = 'bedrock' | 'anthropic' | 'openai' | 'vertex';
+export type AIProviderType = 'bedrock' | 'anthropic' | 'openai' | 'gemini' | 'claude-code';
+
+export interface ProviderModelDefinition {
+  id: string;
+  label: string;
+}
+
+export interface ProviderFieldDefinition {
+  key: string;
+  label: string;
+  type: 'text' | 'password' | 'select';
+  placeholder?: string;
+  required?: boolean;
+  options?: Array<{ id: string; label: string }>;
+}
 
 export interface ChatConversation {
   id: string;

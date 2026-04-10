@@ -16,7 +16,13 @@ import { getEnvironmentChecker } from '../health/environment-checker';
 import { clearGcloudCache } from '../gcp/gcloud-resolver';
 
 const ENCRYPTED_SETTINGS = new Set([
+  // Legacy bedrock keys (backward compat)
   'chat:bedrockAccessKeyId', 'chat:bedrockSecretKey', 'chat:bedrockSessionToken',
+  // New per-provider keys
+  'chat:bedrock:accessKeyId', 'chat:bedrock:secretKey',
+  'chat:anthropic:apiKey',
+  'chat:openai:apiKey', 'chat:openai:orgId',
+  'chat:gemini:apiKey',
 ]);
 
 /** Prefix-based allowlist — supports dynamic keys like gcpBillingBQProject_{orgId}. */
@@ -149,8 +155,14 @@ export function registerAppHandlers(dbManager: DatabaseManager, authService: Aut
     }
   });
 
-  ipcMain.handle('settings:clear-gcloud-cache', async (): Promise<void> => {
-    clearGcloudCache();
+  ipcMain.handle('settings:clear-gcloud-cache', async (): Promise<IpcResponse<void>> => {
+    try {
+      requireAuth();
+      clearGcloudCache();
+      return { success: true, data: undefined };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to clear cache' };
+    }
   });
 
   // ── Environment Health ──

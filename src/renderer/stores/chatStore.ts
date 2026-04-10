@@ -3,9 +3,20 @@
 
 import { create } from 'zustand';
 import type { ChatConversation, ChatMessage, AIStreamChunk, AIProviderType, ChatContext } from '../../shared/types';
+import { PROVIDER_CONFIGS, PROVIDER_ORDER } from '../../shared/constants/provider-configs';
 import { useProfileStore } from './profileStore';
 import { useProviderStore } from './providerStore';
 import { useGCPProjectStore } from './gcpProjectStore';
+
+type ProviderConfigs = Record<AIProviderType, Record<string, string>>;
+
+function buildDefaultConfigs(): ProviderConfigs {
+  const configs = {} as ProviderConfigs;
+  for (const key of PROVIDER_ORDER) {
+    configs[key] = { ...PROVIDER_CONFIGS[key].defaults };
+  }
+  return configs;
+}
 
 interface ChatState {
   conversations: ChatConversation[];
@@ -14,10 +25,7 @@ interface ChatState {
   isStreaming: boolean;
   streamingText: string;
   selectedProvider: AIProviderType;
-  bedrockModel: string;
-  bedrockRegion: string;
-  bedrockAccessKeyId: string;
-  bedrockSecretKey: string;
+  providerConfigs: ProviderConfigs;
   error: string | null;
   isPanelOpen: boolean;
   providers: Array<{ type: AIProviderType; name: string; configured: boolean }>;
@@ -30,35 +38,70 @@ interface ChatState {
   sendMessage: (content: string) => Promise<void>;
   stopGeneration: () => void;
   setProvider: (provider: AIProviderType) => void;
-  setBedrockModel: (model: string) => void;
-  setBedrockRegion: (region: string) => void;
-  setBedrockApiKeys: (accessKeyId: string, secretKey: string) => void;
+  setProviderConfig: (provider: AIProviderType, key: string, value: string) => void;
+  saveProviderSettings: (provider: AIProviderType) => void;
   togglePanel: () => void;
   openPanel: () => void;
   closePanel: () => void;
   loadProviders: () => Promise<void>;
 }
 
-// Load persisted chat settings on store creation
+/** Load persisted chat settings for all providers on store creation */
 const loadPersistedSettings = async (set: (partial: Partial<ChatState>) => void) => {
   try {
-    const [model, region, accessKey, secretKey] = await Promise.all([
-      window.electronAPI.settings.get('chat:bedrockModel'),
-      window.electronAPI.settings.get('chat:bedrockRegion'),
-      window.electronAPI.settings.get('chat:bedrockAccessKeyId'),
-      window.electronAPI.settings.get('chat:bedrockSecretKey'),
-    ]);
-    set({
-      bedrockModel: model.data || 'amazon.nova-pro-v1:0',
-      bedrockRegion: region.data || 'us-east-1',
-      bedrockAccessKeyId: accessKey.data || '',
-      bedrockSecretKey: secretKey.data || '',
-    });
-  } catch {}
+    const configs = buildDefaultConfigs();
+
+    // Load selected provider
+    const providerResult = await window.electronAPI.settings.get('chat:selectedProvider');
+    const selectedProvider = (providerResult.data as AIProviderType) || 'bedrock';
+
+    // Load per-provider settings
+    for (const providerKey of PROVIDER_ORDER) {
+      const providerConfig = PROVIDER_CONFIGS[providerKey];
+      for (const field of providerConfig.fields) {
+        const settingKey = `chat:${providerKey}:${field.key}`;
+        const result = await window.electronAPI.settings.get(settingKey);
+        if (result.data) {
+          configs[providerKey][field.key] = result.data;
+        }
+      }
+    }
+
+    // Backward compatibility: migrate old bedrock keys
+    if (!configs.bedrock.accessKeyId) {
+      const oldAccessKey = await window.electronAPI.settings.get('chat:bedrockAccessKeyId');
+      if (oldAccessKey.data) {
+        configs.bedrock.accessKeyId = oldAccessKey.data;
+        window.electronAPI.settings.set('chat:bedrock:accessKeyId', oldAccessKey.data).catch(() => {});
+      }
+    }
+    if (!configs.bedrock.secretKey) {
+      const oldSecretKey = await window.electronAPI.settings.get('chat:bedrockSecretKey');
+      if (oldSecretKey.data) {
+        configs.bedrock.secretKey = oldSecretKey.data;
+        window.electronAPI.settings.set('chat:bedrock:secretKey', oldSecretKey.data).catch(() => {});
+      }
+    }
+    if (!configs.bedrock.model || configs.bedrock.model === 'amazon.nova-pro-v1:0') {
+      const oldModel = await window.electronAPI.settings.get('chat:bedrockModel');
+      if (oldModel.data) {
+        configs.bedrock.model = oldModel.data;
+      }
+    }
+    if (!configs.bedrock.region || configs.bedrock.region === 'us-east-1') {
+      const oldRegion = await window.electronAPI.settings.get('chat:bedrockRegion');
+      if (oldRegion.data) {
+        configs.bedrock.region = oldRegion.data;
+      }
+    }
+
+    set({ providerConfigs: configs, selectedProvider });
+  } catch {
+    // Silently fail — defaults are fine
+  }
 };
 
 export const useChatStore = create<ChatState>((set, get) => {
-  // Kick off loading persisted settings
   loadPersistedSettings(set);
 
   return {
@@ -68,10 +111,7 @@ export const useChatStore = create<ChatState>((set, get) => {
   isStreaming: false,
   streamingText: '',
   selectedProvider: 'bedrock',
-  bedrockModel: 'amazon.nova-pro-v1:0',
-  bedrockRegion: 'us-east-1',
-  bedrockAccessKeyId: '',
-  bedrockSecretKey: '',
+  providerConfigs: buildDefaultConfigs(),
   error: null,
   isPanelOpen: false,
   providers: [],
@@ -135,16 +175,14 @@ export const useChatStore = create<ChatState>((set, get) => {
   },
 
   sendMessage: async (content: string) => {
-    const { activeConversationId, selectedProvider } = get();
+    const { activeConversationId, selectedProvider, providerConfigs } = get();
 
-    // Create conversation if none
     let convId = activeConversationId;
     if (!convId) {
       convId = await get().createConversation();
       if (!convId) return;
     }
 
-    // Add user message to UI immediately
     const userMsg: ChatMessage = {
       id: `temp-${Date.now()}`,
       conversationId: convId,
@@ -160,7 +198,7 @@ export const useChatStore = create<ChatState>((set, get) => {
       error: null,
     }));
 
-    // Build context - cloud provider context is for tools (which resources to query)
+    // Build cloud context for tools
     const profileName = useProfileStore.getState().selectedProfileName;
     const cloudProvider = useProviderStore.getState().selectedProvider;
     const projectId = useGCPProjectStore.getState().selectedProjectId;
@@ -170,22 +208,18 @@ export const useChatStore = create<ChatState>((set, get) => {
       projectId: projectId || undefined,
     };
 
-    // AI provider config is independent - uses its own API keys
-    const { bedrockModel, bedrockRegion, bedrockAccessKeyId, bedrockSecretKey } = get();
-    const providerConfig = {
-      region: bedrockRegion,
-      model: bedrockModel,
-      accessKeyId: bedrockAccessKeyId || undefined,
-      secretAccessKey: bedrockSecretKey || undefined,
-    };
+    // Build provider config from current provider settings
+    const currentConfig = providerConfigs[selectedProvider] || {};
+    const providerConfig: Record<string, string | undefined> = {};
+    for (const [k, v] of Object.entries(currentConfig)) {
+      providerConfig[k] = v || undefined;
+    }
 
-    // Subscribe to stream chunks
     const unsubscribe = window.electronAPI.chat.onStreamChunk((chunk: AIStreamChunk) => {
       const state = get();
       if (chunk.type === 'text' && chunk.text) {
         set({ streamingText: state.streamingText + chunk.text });
       } else if (chunk.type === 'tool_use' && chunk.toolUse) {
-        // Flush any accumulated streaming text as an assistant message before tool use
         const currentText = get().streamingText;
         const newMessages = [...get().messages];
         if (currentText) {
@@ -225,7 +259,6 @@ export const useChatStore = create<ChatState>((set, get) => {
     try {
       await window.electronAPI.chat.sendMessage(convId, content, selectedProvider, context, providerConfig);
 
-      // Add final assistant message from accumulated streaming text
       const finalText = get().streamingText;
       if (finalText) {
         const assistantMsg: ChatMessage = {
@@ -238,7 +271,6 @@ export const useChatStore = create<ChatState>((set, get) => {
         set(state => ({ messages: [...state.messages, assistantMsg] }));
       }
 
-      // Update conversation title if first message
       if (get().messages.filter(m => m.role === 'user').length === 1) {
         const title = content.slice(0, 60) + (content.length > 60 ? '...' : '');
         await window.electronAPI.chat.updateTitle(convId, title);
@@ -266,22 +298,26 @@ export const useChatStore = create<ChatState>((set, get) => {
 
   setProvider: (provider: AIProviderType) => {
     set({ selectedProvider: provider });
+    window.electronAPI.settings.set('chat:selectedProvider', provider).catch(() => {});
   },
 
-  setBedrockModel: (model: string) => {
-    set({ bedrockModel: model });
-    window.electronAPI.settings.set('chat:bedrockModel', model).catch(() => {});
+  setProviderConfig: (provider: AIProviderType, key: string, value: string) => {
+    set(state => ({
+      providerConfigs: {
+        ...state.providerConfigs,
+        [provider]: {
+          ...state.providerConfigs[provider],
+          [key]: value,
+        },
+      },
+    }));
   },
 
-  setBedrockRegion: (region: string) => {
-    set({ bedrockRegion: region });
-    window.electronAPI.settings.set('chat:bedrockRegion', region).catch(() => {});
-  },
-
-  setBedrockApiKeys: (accessKeyId: string, secretKey: string) => {
-    set({ bedrockAccessKeyId: accessKeyId, bedrockSecretKey: secretKey });
-    window.electronAPI.settings.set('chat:bedrockAccessKeyId', accessKeyId).catch(() => {});
-    window.electronAPI.settings.set('chat:bedrockSecretKey', secretKey).catch(() => {});
+  saveProviderSettings: (provider: AIProviderType) => {
+    const config = get().providerConfigs[provider] || {};
+    for (const [key, value] of Object.entries(config)) {
+      window.electronAPI.settings.set(`chat:${provider}:${key}`, value).catch(() => {});
+    }
   },
 
   togglePanel: () => {

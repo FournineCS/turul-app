@@ -46,7 +46,7 @@ src/
 │   │   ├── providers/             # bedrock-provider.ts (primary)
 │   │   └── tools/                 # aws-tools.ts, db-tools.ts, gcp-tools.ts, tool-registry.ts
 │   ├── aws/
-│   │   ├── client-factory.ts      # AWS SDK v3 client management (122 clients)
+│   │   ├── client-factory.ts      # AWS SDK v3 client management (121 clients)
 │   │   ├── profile-manager.ts     # AWS profile/credential management
 │   │   ├── rate-limiter.ts        # Per-service API rate limiting
 │   │   ├── scanners/              # 117 service scanner files
@@ -59,7 +59,7 @@ src/
 │   │   │   └── compliance/        # CIS AWS v3 framework (cis-controls.ts, index.ts, types.ts)
 │   │   └── well-architected/      # Workloads, lens reviews, improvements, best-practices/, types, index
 │   ├── gcp/
-│   │   ├── client-factory.ts      # GCP SDK client management (36 imports, 119 getters)
+│   │   ├── client-factory.ts      # GCP SDK client management (36 imports, 59 getters)
 │   │   ├── auth-manager.ts        # gcloud ADC login/revoke via CLI subprocess
 │   │   ├── gcloud-resolver.ts     # Cross-platform gcloud binary path resolver (cached, DB-backed)
 │   │   ├── project-manager.ts     # Multi-project support
@@ -68,24 +68,24 @@ src/
 │   │   ├── iam-analysis/          # Service account analysis (unused-service-accounts.ts, overly-permissive.ts, service-account-keys.ts, cross-project-bindings.ts, types.ts, index.ts)
 │   │   ├── label-governance/      # Label compliance pipeline (index.ts, types.ts)
 │   │   ├── network-analysis/      # VPC reachability (reachability.ts, vpc-analysis.ts, types.ts, index.ts)
-│   │   ├── cost/                  # Billing, CUD, recommendations, GKE costs, idle resources, stopped VMs (11 files)
+│   │   ├── cost/                  # Billing, CUD, recommendations, GKE costs, idle resources, stopped VMs (12 files)
 │   │   ├── security/
 │   │   │   ├── scc-integration.ts # Security Command Center
 │   │   │   ├── best-practices.ts  # GCP best practices checks
 │   │   │   └── compliance/        # CIS GCP framework (cis-gcp-controls.ts, index.ts)
 │   │   └── well-architected/      # 5 pillar check files + index + types (GCP-native, no API dependency)
 │   ├── database/
-│   │   └── db-manager.ts          # SQLite (better-sqlite3, WAL mode, 20 migrations)
+│   │   └── db-manager.ts          # SQLite (better-sqlite3, WAL mode, 26 migrations)
 │   ├── health/
 │   │   └── environment-checker.ts # Validates gcloud, AWS CLI, credentials at startup
 │   ├── scanning/                  # scan-orchestrator.ts, gcp-scan-orchestrator.ts, multi-account-orchestrator.ts, relationship-builder.ts, gcp-relationship-builder.ts, scan-scheduler.ts, scan-diff.ts
 │   ├── assessment/                # AWS assessment (orchestrator.ts, scoring.ts, recommendations.ts, index.ts)
-│   ├── reports/                   # assessment-pdf-generator.ts, cost-export.ts, cost-pdf-generator.ts, csv-generator.ts, excel-generator.ts, gke-cost-export.ts, gke-cost-pdf-generator.ts, optimization-export.ts, optimization-pdf-generator.ts, pdf-chart-helpers.ts, pdf-generator.ts
+│   ├── reports/                   # assessment-pdf-generator.ts, gcp-assessment-pdf-generator.ts, cost-export.ts, cost-pdf-generator.ts, csv-generator.ts, excel-generator.ts, gke-cost-export.ts, gke-cost-pdf-generator.ts, optimization-export.ts, optimization-pdf-generator.ts, pdf-chart-helpers.ts, pdf-generator.ts
 │   └── ipc/                       # 10 Electron IPC handler files: app-handlers.ts, auth-handlers.ts, aws-handlers.ts, chat-handlers.ts, gcp-handlers.ts, profile-handlers.ts, resource-handlers.ts, ipc-utils.ts, validation.ts, index.ts
 ├── renderer/                      # React frontend (Vite)
-│   ├── App.tsx                    # Router + sidebar (21 nav items filtered by provider; Settings/Profiles/Lock in sidebar footer)
+│   ├── App.tsx                    # Router + sidebar (22 nav items filtered by provider; Settings/Profiles/Lock in sidebar footer)
 │   ├── main.tsx                   # React entry
-│   ├── pages/                     # 24 page components
+│   ├── pages/                     # 26 page components (includes LoginPage, SetupPage)
 │   ├── components/                # 81 component files across: assessment/, auth/, chat/, costs/, dashboard/, profiles/, scan/, schedule/, security/, settings/, tag-governance/, topology/, well-architected/ + top-level shared components
 │   ├── stores/                    # 22 Zustand stores
 │   ├── styles/                    # global.css, auth.css, chat.css, help.css, profiles.css

@@ -116,7 +116,9 @@ export class BedrockProvider implements AIProvider {
         let input: Record<string, unknown> = {};
         try {
           input = JSON.parse(currentToolUse.inputJson);
-        } catch {}
+        } catch (parseErr) {
+          console.warn('[bedrock] Failed to parse tool input JSON:', currentToolUse.inputJson.slice(0, 200), parseErr);
+        }
         yield {
           type: 'tool_use',
           toolUse: { id: currentToolUse.id, name: currentToolUse.name, input },

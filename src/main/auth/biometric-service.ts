@@ -61,7 +61,7 @@ export class BiometricService {
   disableBiometric(): void {
     try {
       this.dbManager.setSetting('biometric_enabled', 'false');
-      this.dbManager.setSetting('biometric_key_blob', '');
+      this.dbManager.setSetting('biometric_key_blob', null as any);
     } catch {
       // Best effort cleanup
     }

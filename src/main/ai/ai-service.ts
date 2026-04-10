@@ -6,6 +6,10 @@ import type { AIProvider } from './ai-provider';
 import type { AIStreamChunk, ChatContext, ChatMessage, AIProviderType } from '../../shared/types/chat';
 import type { DatabaseManager } from '../database/db-manager';
 import { BedrockProvider } from './providers/bedrock-provider';
+import { AnthropicProvider } from './providers/anthropic-provider';
+import { OpenAIProvider } from './providers/openai-provider';
+import { GeminiProvider } from './providers/gemini-provider';
+import { ClaudeCodeProvider } from './providers/claude-code-provider';
 import { buildSystemPrompt } from './system-prompt';
 import { getToolDefinitionsForProvider, executeTool } from './tools/tool-registry';
 
@@ -29,11 +33,11 @@ export class AIService {
     userMessage: string,
     providerType: AIProviderType,
     context?: ChatContext,
-    providerConfig?: { region?: string; model?: string; accessKeyId?: string; secretAccessKey?: string }
+    providerConfig?: Record<string, string | undefined>
   ): AsyncGenerator<AIStreamChunk> {
-    const provider = this.createProvider(providerType, providerConfig);
+    const provider = this.createProvider(providerType, providerConfig, context);
     if (!provider) {
-      yield { type: 'error', error: `AI provider not configured. Please enter your Bedrock API keys in Chat Settings (gear icon).` };
+      yield { type: 'error', error: `AI provider not configured. Please configure your provider in Chat Settings (gear icon).` };
       return;
     }
 
@@ -54,6 +58,13 @@ export class AIService {
       const messages = this.buildMessageHistory(dbMessages);
 
       const systemPrompt = buildSystemPrompt(context);
+
+      // Claude Code handles tools internally via MCP — bypass the tool loop
+      if (providerType === 'claude-code') {
+        yield* this.streamClaudeCode(provider, conversationId, messages, systemPrompt, context, abortController);
+        return;
+      }
+
       const tools = getToolDefinitionsForProvider(context?.cloudProvider || 'aws');
 
       let currentMessages = [...messages];
@@ -201,6 +212,73 @@ export class AIService {
     }
   }
 
+  /**
+   * Stream from Claude Code provider — no tool loop needed.
+   * The SDK + MCP server handle tool execution internally.
+   */
+  private async *streamClaudeCode(
+    provider: AIProvider,
+    conversationId: string,
+    messages: Array<{ role: 'user' | 'assistant'; content: string | Array<{ type: string; [key: string]: unknown }> }>,
+    systemPrompt: string,
+    context?: ChatContext,
+    abortController?: AbortController
+  ): AsyncGenerator<AIStreamChunk> {
+    let assistantText = '';
+
+    const stream = provider.sendMessage({
+      messages,
+      systemPrompt,
+      context,
+      // No tools — Claude Code uses MCP tools internally
+    });
+
+    for await (const chunk of stream) {
+      if (abortController?.signal.aborted) {
+        yield { type: 'done' };
+        return;
+      }
+
+      if (chunk.type === 'text') {
+        assistantText += chunk.text || '';
+        yield chunk;
+      } else if (chunk.type === 'tool_use') {
+        // Pass through for UI visibility
+        yield chunk;
+      } else if (chunk.type === 'tool_result') {
+        // Pass through for UI visibility
+        yield chunk;
+      } else if (chunk.type === 'error') {
+        yield chunk;
+        return;
+      } else if (chunk.type === 'done') {
+        const cleanText = stripThinking(assistantText);
+        if (cleanText) {
+          this.dbManager.addChatMessage({
+            id: crypto.randomUUID(),
+            conversationId,
+            role: 'assistant',
+            content: cleanText,
+          });
+        }
+        yield { type: 'done' };
+        return;
+      }
+    }
+
+    // Stream ended without 'done' chunk
+    const cleanText = stripThinking(assistantText);
+    if (cleanText) {
+      this.dbManager.addChatMessage({
+        id: crypto.randomUUID(),
+        conversationId,
+        role: 'assistant',
+        content: cleanText,
+      });
+    }
+    yield { type: 'done' };
+  }
+
   stopGeneration(conversationId: string): void {
     const controller = this.abortControllers.get(conversationId);
     if (controller) {
@@ -208,45 +286,62 @@ export class AIService {
     }
   }
 
-  getProviders(profileName?: string): Array<{ type: AIProviderType; name: string; configured: boolean }> {
+  getProviders(): Array<{ type: AIProviderType; name: string; configured: boolean }> {
     return [
-      {
-        type: 'bedrock',
-        name: 'AWS Bedrock',
-        configured: !!profileName,
-      },
-      {
-        type: 'anthropic',
-        name: 'Anthropic',
-        configured: false, // Phase 4
-      },
-      {
-        type: 'openai',
-        name: 'OpenAI',
-        configured: false, // Phase 4
-      },
-      {
-        type: 'vertex',
-        name: 'GCP Vertex AI',
-        configured: false, // Phase 4
-      },
+      { type: 'bedrock', name: 'AWS Bedrock', configured: true },
+      { type: 'anthropic', name: 'Anthropic (Claude)', configured: true },
+      { type: 'openai', name: 'OpenAI', configured: true },
+      { type: 'gemini', name: 'Google Gemini', configured: true },
+      { type: 'claude-code', name: 'Claude Code (Local)', configured: true },
     ];
   }
 
   private createProvider(
     type: AIProviderType,
-    config?: { profileName?: string; region?: string; model?: string; accessKeyId?: string; secretAccessKey?: string }
+    config?: Record<string, string | undefined>,
+    context?: ChatContext
   ): AIProvider | null {
     switch (type) {
-      case 'bedrock':
-        if (!config?.accessKeyId) return null;
+      case 'bedrock': {
+        // Support both old and new config key names
+        const accessKeyId = config?.accessKeyId || config?.accessKey;
+        if (!accessKeyId) return null;
         return new BedrockProvider({
-          region: config.region || 'us-east-1',
-          modelId: config.model,
-          accessKeyId: config.accessKeyId,
-          secretAccessKey: config.secretAccessKey,
+          region: config?.region || 'us-east-1',
+          modelId: config?.model,
+          accessKeyId,
+          secretAccessKey: config?.secretKey || config?.secretAccessKey,
         });
-      // Phase 4: anthropic, openai, vertex
+      }
+      case 'anthropic': {
+        if (!config?.apiKey) return null;
+        return new AnthropicProvider({
+          apiKey: config.apiKey,
+          modelId: config.model,
+        });
+      }
+      case 'openai': {
+        if (!config?.apiKey) return null;
+        return new OpenAIProvider({
+          apiKey: config.apiKey,
+          orgId: config.orgId,
+          modelId: config.model,
+        });
+      }
+      case 'gemini': {
+        if (!config?.apiKey) return null;
+        return new GeminiProvider({
+          apiKey: config.apiKey,
+          modelId: config.model,
+        });
+      }
+      case 'claude-code': {
+        return new ClaudeCodeProvider({
+          cliPath: config?.cliPath,
+          dbPath: this.dbManager.getDbPath(),
+          context,
+        });
+      }
       default:
         return null;
     }

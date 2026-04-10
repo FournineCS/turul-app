@@ -3,24 +3,10 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useChatStore } from '../../stores/chatStore';
+import { PROVIDER_CONFIGS, PROVIDER_ORDER } from '../../../shared/constants/provider-configs';
+import type { AIProviderType } from '../../../shared/types/chat';
 import ChatMessageComponent, { stripThinking } from './ChatMessage';
 import ChatInput from './ChatInput';
-
-const BEDROCK_MODELS = [
-  { id: 'amazon.nova-pro-v1:0', label: 'Amazon Nova Pro' },
-  { id: 'amazon.nova-lite-v1:0', label: 'Amazon Nova Lite' },
-  { id: 'amazon.nova-micro-v1:0', label: 'Amazon Nova Micro' },
-  { id: 'anthropic.claude-sonnet-4-20250514-v1:0', label: 'Claude Sonnet 4' },
-  { id: 'anthropic.claude-haiku-4-5-20251001-v1:0', label: 'Claude Haiku 4.5' },
-  { id: 'anthropic.claude-3-5-sonnet-20241022-v2:0', label: 'Claude 3.5 Sonnet v2' },
-];
-
-const BEDROCK_REGIONS = [
-  { id: 'us-east-1', label: 'US East (N. Virginia)' },
-  { id: 'us-west-2', label: 'US West (Oregon)' },
-  { id: 'eu-west-1', label: 'EU (Ireland)' },
-  { id: 'ap-northeast-1', label: 'Asia Pacific (Tokyo)' },
-];
 
 const ChatPanel: React.FC = () => {
   const {
@@ -32,44 +18,38 @@ const ChatPanel: React.FC = () => {
     isStreaming,
     streamingText,
     selectedProvider,
-    bedrockModel,
-    bedrockRegion,
-    bedrockAccessKeyId,
-    bedrockSecretKey,
+    providerConfigs,
     error,
     loadConversations,
     selectConversation,
     createConversation,
     deleteConversation,
     setProvider,
-    setBedrockModel,
-    setBedrockRegion,
-    setBedrockApiKeys,
+    setProviderConfig,
+    saveProviderSettings,
   } = useChatStore();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [showSettings, setShowSettings] = useState(false);
-  const [localModel, setLocalModel] = useState(bedrockModel);
-  const [localRegion, setLocalRegion] = useState(bedrockRegion);
-  const [localAccessKey, setLocalAccessKey] = useState(bedrockAccessKeyId);
-  const [localSecretKey, setLocalSecretKey] = useState(bedrockSecretKey);
+  const [localConfig, setLocalConfig] = useState<Record<string, string>>({});
   const [settingsSaved, setSettingsSaved] = useState(false);
 
-  // Sync local state when persisted settings load
+  // Sync local state when provider or persisted settings change
   useEffect(() => {
-    setLocalModel(bedrockModel);
-    setLocalRegion(bedrockRegion);
-    setLocalAccessKey(bedrockAccessKeyId);
-    setLocalSecretKey(bedrockSecretKey);
-  }, [bedrockModel, bedrockRegion, bedrockAccessKeyId, bedrockSecretKey]);
+    setLocalConfig({ ...providerConfigs[selectedProvider] });
+  }, [selectedProvider, providerConfigs]);
 
   const handleSaveSettings = () => {
-    setBedrockModel(localModel);
-    setBedrockRegion(localRegion);
-    setBedrockApiKeys(localAccessKey, localSecretKey);
+    const config = localConfig;
+    for (const [key, value] of Object.entries(config)) {
+      setProviderConfig(selectedProvider, key, value);
+    }
+    saveProviderSettings(selectedProvider);
     setSettingsSaved(true);
     setTimeout(() => setSettingsSaved(false), 2000);
   };
+
+  const providerConfig = PROVIDER_CONFIGS[selectedProvider];
 
   useEffect(() => {
     if (isPanelOpen) {
@@ -120,40 +100,50 @@ const ChatPanel: React.FC = () => {
       {showSettings && (
         <div className="chat-settings">
           <div className="chat-settings-group">
-            <label>Model</label>
-            <select value={localModel} onChange={(e) => setLocalModel(e.target.value)}>
-              {BEDROCK_MODELS.map(m => (
-                <option key={m.id} value={m.id}>{m.label}</option>
+            <label>Provider</label>
+            <select
+              value={selectedProvider}
+              onChange={(e) => setProvider(e.target.value as AIProviderType)}
+            >
+              {PROVIDER_ORDER.map(p => (
+                <option key={p} value={p}>{PROVIDER_CONFIGS[p].label}</option>
               ))}
             </select>
           </div>
-          <div className="chat-settings-group">
-            <label>Region</label>
-            <select value={localRegion} onChange={(e) => setLocalRegion(e.target.value)}>
-              {BEDROCK_REGIONS.map(r => (
-                <option key={r.id} value={r.id}>{r.label}</option>
-              ))}
-            </select>
-          </div>
-          <div className="chat-settings-group">
-            <label>Access Key ID</label>
-            <input
-              type="text"
-              value={localAccessKey}
-              onChange={(e) => setLocalAccessKey(e.target.value)}
-              placeholder="AKIA..."
-              spellCheck={false}
-            />
-          </div>
-          <div className="chat-settings-group">
-            <label>Secret Access Key</label>
-            <input
-              type="password"
-              value={localSecretKey}
-              onChange={(e) => setLocalSecretKey(e.target.value)}
-              placeholder="Secret key"
-            />
-          </div>
+
+          {providerConfig.fields.map(field => (
+            <div key={field.key} className="chat-settings-group">
+              <label>{field.label}</label>
+              {field.key === 'model' && providerConfig.models.length > 0 ? (
+                <select
+                  value={localConfig.model || ''}
+                  onChange={(e) => setLocalConfig({ ...localConfig, model: e.target.value })}
+                >
+                  {providerConfig.models.map(m => (
+                    <option key={m.id} value={m.id}>{m.label}</option>
+                  ))}
+                </select>
+              ) : field.type === 'select' && field.options ? (
+                <select
+                  value={localConfig[field.key] || ''}
+                  onChange={(e) => setLocalConfig({ ...localConfig, [field.key]: e.target.value })}
+                >
+                  {field.options.map(o => (
+                    <option key={o.id} value={o.id}>{o.label}</option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type={field.type === 'password' ? 'password' : 'text'}
+                  value={localConfig[field.key] || ''}
+                  onChange={(e) => setLocalConfig({ ...localConfig, [field.key]: e.target.value })}
+                  placeholder={field.placeholder}
+                  spellCheck={false}
+                />
+              )}
+            </div>
+          ))}
+
           <button className="chat-settings-save" onClick={handleSaveSettings}>
             {settingsSaved ? '✓ Saved' : 'Save Settings'}
           </button>

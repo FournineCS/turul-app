@@ -18,7 +18,7 @@ export function registerChatHandlers(dbManager: DatabaseManager, authService: Au
       requireAuth();
       const cId   = assertString(conversationId, 'conversationId', 1, 256);
       const msg   = assertString(message, 'message', 1, 100_000);
-      const pType = assertOneOf(providerType, ['bedrock'] as const, 'providerType');
+      const pType = assertOneOf(providerType, ['bedrock', 'anthropic', 'openai', 'gemini', 'claude-code'] as const, 'providerType');
       const ctx   = assertObject(context, 'context');
       const cfg   = assertObject(providerConfig, 'providerConfig');
       let fullText = '';
@@ -51,10 +51,11 @@ export function registerChatHandlers(dbManager: DatabaseManager, authService: Au
     }
   });
 
-  ipcMain.handle('chat:stop-generation', async (_, conversationId: string): Promise<IpcResponse<void>> => {
+  ipcMain.handle('chat:stop-generation', async (_, conversationId: unknown): Promise<IpcResponse<void>> => {
     try {
       requireAuth();
-      aiService.stopGeneration(conversationId);
+      const cId = assertString(conversationId, 'conversationId', 1, 256);
+      aiService.stopGeneration(cId);
       return { success: true, data: undefined };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Failed to stop' };
@@ -80,13 +81,14 @@ export function registerChatHandlers(dbManager: DatabaseManager, authService: Au
     }
   });
 
-  ipcMain.handle('chat:get-conversation', async (_, id: string): Promise<IpcResponse<{ conversation: ChatConversation; messages: ChatMessage[] }>> => {
+  ipcMain.handle('chat:get-conversation', async (_, id: unknown): Promise<IpcResponse<{ conversation: ChatConversation; messages: ChatMessage[] }>> => {
     try {
       requireAuth();
-      const conv = dbManager.getConversation(id);
+      const convId = assertString(id, 'id', 1, 256);
+      const conv = dbManager.getConversation(convId);
       if (!conv) return { success: false, error: 'Conversation not found' };
 
-      const msgs = dbManager.getChatMessages(id);
+      const msgs = dbManager.getChatMessages(convId);
       return {
         success: true,
         data: {
@@ -113,11 +115,13 @@ export function registerChatHandlers(dbManager: DatabaseManager, authService: Au
     }
   });
 
-  ipcMain.handle('chat:create-conversation', async (_, title: string, provider: string): Promise<IpcResponse<ChatConversation>> => {
+  ipcMain.handle('chat:create-conversation', async (_, title: unknown, provider: unknown): Promise<IpcResponse<ChatConversation>> => {
     try {
       requireAuth();
+      const t = assertString(title, 'title', 1, 200);
+      const p = assertOneOf(provider, ['bedrock', 'anthropic', 'openai', 'gemini', 'claude-code'] as const, 'provider');
       const id = crypto.randomUUID();
-      dbManager.createConversation(id, title, provider);
+      dbManager.createConversation(id, t, p);
       const conv = dbManager.getConversation(id)!;
       return {
         success: true,
@@ -134,20 +138,23 @@ export function registerChatHandlers(dbManager: DatabaseManager, authService: Au
     }
   });
 
-  ipcMain.handle('chat:delete-conversation', async (_, id: string): Promise<IpcResponse<void>> => {
+  ipcMain.handle('chat:delete-conversation', async (_, id: unknown): Promise<IpcResponse<void>> => {
     try {
       requireAuth();
-      dbManager.deleteConversation(id);
+      const cId = assertString(id, 'id', 1, 256);
+      dbManager.deleteConversation(cId);
       return { success: true, data: undefined };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Failed to delete conversation' };
     }
   });
 
-  ipcMain.handle('chat:update-title', async (_, id: string, title: string): Promise<IpcResponse<void>> => {
+  ipcMain.handle('chat:update-title', async (_, id: unknown, title: unknown): Promise<IpcResponse<void>> => {
     try {
       requireAuth();
-      dbManager.updateConversationTitle(id, title);
+      const cId = assertString(id, 'id', 1, 256);
+      const t = assertString(title, 'title', 1, 200);
+      dbManager.updateConversationTitle(cId, t);
       return { success: true, data: undefined };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Failed to update title' };
@@ -157,7 +164,7 @@ export function registerChatHandlers(dbManager: DatabaseManager, authService: Au
   ipcMain.handle('chat:get-providers', async (_, profileName?: string): Promise<IpcResponse<any[]>> => {
     try {
       requireAuth();
-      return { success: true, data: aiService.getProviders(profileName) };
+      return { success: true, data: aiService.getProviders() };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Failed to get providers' };
     }

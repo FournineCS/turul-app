@@ -39,8 +39,8 @@ export function registerAuthHandlers(
     'auth:setup',
     async (_, req: AuthSetupRequest): Promise<IpcResponse<void>> => {
       try {
-        const password = assertString(req?.password, 'password', 6, 128);
-        const confirmPassword = assertString(req?.confirmPassword, 'confirmPassword', 6, 128);
+        const password = assertString(req?.password, 'password', 12, 128);
+        const confirmPassword = assertString(req?.confirmPassword, 'confirmPassword', 12, 128);
         await authService.setup(password, confirmPassword);
         appProfileManager.registerAllCredentials();
         return { success: true };
@@ -89,8 +89,8 @@ export function registerAuthHandlers(
     async (_, req: AuthChangePasswordRequest): Promise<IpcResponse<void>> => {
       try {
         const currentPassword = assertString(req?.currentPassword, 'currentPassword', 1, 128);
-        const newPassword = assertString(req?.newPassword, 'newPassword', 6, 128);
-        const confirmNewPassword = assertString(req?.confirmNewPassword, 'confirmNewPassword', 6, 128);
+        const newPassword = assertString(req?.newPassword, 'newPassword', 12, 128);
+        const confirmNewPassword = assertString(req?.confirmNewPassword, 'confirmNewPassword', 12, 128);
         await authService.changePassword(currentPassword, newPassword, confirmNewPassword);
         appProfileManager.registerAllCredentials();
         return { success: true };

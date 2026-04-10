@@ -119,6 +119,7 @@ export function registerAWSHandlers(
     'aws:validate-profile',
     async (_, profileName: unknown): Promise<IpcResponse<{ accountId: string }>> => {
       try {
+        requireAuth();
         const name = assertProfileName(profileName, 'profileName');
         const profileManager = getProfileManager();
         const result = await profileManager.validateProfile(name);

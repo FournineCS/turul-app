@@ -118,11 +118,22 @@ export function assertStringArray(val: unknown, field: string, maxItems = 100): 
 }
 
 /** Reject path traversal — the resolved path must stay within the given base. */
-export function assertSafePath(outputPath: string, field = 'outputPath'): string {
-  const resolved = path.resolve(outputPath);
+export function assertSafePath(outputPath: string, field = 'outputPath', baseDir?: string): string {
+  // Reject null bytes which can truncate paths in C-backed APIs
+  if (outputPath.includes('\0')) {
+    throw new Error(`${field} must not contain null bytes`);
+  }
   // Canonical path check: resolve symlinks and encoded sequences
   if (outputPath.includes('..') || outputPath.includes('%2e') || outputPath.includes('%2E')) {
     throw new Error(`${field} must not contain path traversal sequences`);
+  }
+  const resolved = path.resolve(outputPath);
+  // If a base directory is specified, confine the path within it
+  if (baseDir) {
+    const resolvedBase = path.resolve(baseDir);
+    if (!resolved.startsWith(resolvedBase + path.sep) && resolved !== resolvedBase) {
+      throw new Error(`${field} must be within ${baseDir}`);
+    }
   }
   return resolved;
 }

@@ -61,6 +61,10 @@ export class DatabaseManager {
     this.dbPath = path.join(userDataPath, 'aws-analyzer.db');
   }
 
+  getDbPath(): string {
+    return this.dbPath;
+  }
+
   async initialize(): Promise<void> {
     this.db = new Database(this.dbPath);
 
@@ -717,11 +721,13 @@ export class DatabaseManager {
   searchResources(scanId: string, query: string): Resource[] {
     if (!this.db) throw new Error('Database not initialized');
 
-    const searchQuery = `%${query}%`;
+    // Escape LIKE wildcards to prevent unintended pattern matching
+    const escaped = query.replace(/[%_\\]/g, '\\$&');
+    const searchQuery = `%${escaped}%`;
     const rows = this.db
       .prepare(
         `SELECT * FROM resources
-         WHERE scan_id = ? AND (name LIKE ? OR id LIKE ? OR tags LIKE ?)`
+         WHERE scan_id = ? AND (name LIKE ? ESCAPE '\\' OR id LIKE ? ESCAPE '\\' OR tags LIKE ? ESCAPE '\\')`
       )
       .all(scanId, searchQuery, searchQuery, searchQuery) as RawResource[];
 

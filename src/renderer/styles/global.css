@@ -269,6 +269,30 @@ input, select, textarea {
   padding: 18px 12px 6px 12px;
 }
 
+.nav-section-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+}
+
+.nav-section-toggle:hover {
+  color: var(--color-text-secondary);
+}
+
+.nav-section-chevron {
+  transition: transform 0.2s ease;
+  opacity: 0.5;
+}
+
+.nav-section-chevron.collapsed {
+  transform: rotate(-90deg);
+}
+
 .nav-item {
   display: flex;
   align-items: center;

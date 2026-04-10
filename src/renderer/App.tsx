@@ -192,6 +192,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { path: '/dashboard',        label: 'Dashboard',       icon: DashboardIcon,      providers: ['aws', 'gcp'] },
+  { path: '/chat',             label: 'AI Chat',         icon: ChatBotIcon,        providers: ['aws', 'gcp'], section: 'AI Assistant' },
   { path: '/scan',             label: 'Scan',            icon: ScanIcon,           providers: ['aws', 'gcp'], section: 'Discovery' },
   { path: '/resources',        label: 'Resources',       icon: ResourcesIcon,      providers: ['aws', 'gcp'] },
   { path: '/topology',         label: 'Architecture',    icon: ArchitectureIcon,   providers: ['aws', 'gcp'] },
@@ -212,7 +213,6 @@ const NAV_ITEMS: NavItem[] = [
   { path: '/schedule',         label: 'Schedules',       icon: ScheduleIcon,       providers: ['aws', 'gcp'] },
   { path: '/assessment',       label: 'Assessment',      icon: AssessmentIcon,     providers: ['aws', 'gcp'], section: 'Assessment & Reports' },
   { path: '/reports',          label: 'Reports',         icon: ReportsIcon,        providers: ['aws', 'gcp'] },
-  { path: '/chat',             label: 'AI Chat',         icon: ChatBotIcon,        providers: ['aws', 'gcp'], section: 'AI Assistant' },
 ];
 
 const AWS_ONLY_PATHS = new Set(
@@ -265,6 +265,19 @@ const AppContent: React.FC = () => {
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   const [isManageProfilesOpen, setIsManageProfilesOpen] = useState(false);
   const [isTourOpen, setIsTourOpen] = useState(false);
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+
+  const toggleSection = useCallback((section: string) => {
+    setCollapsedSections(prev => {
+      const next = new Set(prev);
+      if (next.has(section)) {
+        next.delete(section);
+      } else {
+        next.add(section);
+      }
+      return next;
+    });
+  }, []);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -373,17 +386,38 @@ const AppContent: React.FC = () => {
               emittedSections.add(currentSection);
               sectionLabel = currentSection;
             }
+            const isCollapsed = currentSection ? collapsedSections.has(currentSection) : false;
+            // Dashboard (no section) is never collapsed
+            const isTopLevel = !currentSection;
             const Icon = item.icon;
             return (
               <React.Fragment key={item.path}>
-                {sectionLabel && <div className="nav-section-label">{sectionLabel}</div>}
-                <NavLink
-                  to={item.path}
-                  className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-                >
-                  <Icon />
-                  <span>{item.label}</span>
-                </NavLink>
+                {sectionLabel && (
+                  <button
+                    className="nav-section-label nav-section-toggle"
+                    onClick={() => toggleSection(sectionLabel!)}
+                  >
+                    <span>{sectionLabel}</span>
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                      width="12"
+                      height="12"
+                      className={`nav-section-chevron ${isCollapsed ? 'collapsed' : ''}`}
+                    >
+                      <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z" />
+                    </svg>
+                  </button>
+                )}
+                {(isTopLevel || !isCollapsed) && (
+                  <NavLink
+                    to={item.path}
+                    className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+                  >
+                    <Icon />
+                    <span>{item.label}</span>
+                  </NavLink>
+                )}
               </React.Fragment>
             );
           })}

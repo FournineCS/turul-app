@@ -2,6 +2,8 @@
 // Copyright 2024-present Fournine Cloud
 
 import React, { useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import type { ChatMessage as ChatMessageType } from '../../../shared/types';
 
 /** Strip <thinking>...</thinking> blocks from model output */
@@ -32,7 +34,11 @@ const ChatMessageComponent: React.FC<Props> = ({ message }) => {
     return (
       <div className="chat-message chat-message--assistant">
         <div className="chat-message-bubble chat-message-bubble--assistant">
-          <MarkdownContent text={cleanContent} />
+          <div className="chat-markdown">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {cleanContent}
+            </ReactMarkdown>
+          </div>
         </div>
       </div>
     );
@@ -104,51 +110,5 @@ function formatJson(text: string): string {
     return text;
   }
 }
-
-/**
- * Safe markdown renderer that uses React elements instead of dangerouslySetInnerHTML.
- * Handles code blocks, bold, inline code, and newlines.
- */
-const MarkdownContent: React.FC<{ text: string }> = ({ text }) => {
-  // Split on code blocks first
-  const parts = text.split(/(```[\s\S]*?```)/g);
-
-  return (
-    <>
-      {parts.map((part, i) => {
-        if (part.startsWith('```')) {
-          const content = part.replace(/^```\w*\n?/, '').replace(/```$/, '');
-          return <pre key={i} className="chat-code-block">{content}</pre>;
-        }
-        return <InlineMarkdown key={i} text={part} />;
-      })}
-    </>
-  );
-};
-
-/**
- * Renders inline markdown (bold, inline code, newlines) using safe React elements.
- */
-const InlineMarkdown: React.FC<{ text: string }> = ({ text }) => {
-  // Split on bold (**text**) and inline code (`text`)
-  const tokens = text.split(/(\*\*.*?\*\*|`[^`]+`|\n)/g);
-
-  return (
-    <>
-      {tokens.map((token, i) => {
-        if (token === '\n') {
-          return <br key={i} />;
-        }
-        if (token.startsWith('**') && token.endsWith('**')) {
-          return <strong key={i}>{token.slice(2, -2)}</strong>;
-        }
-        if (token.startsWith('`') && token.endsWith('`')) {
-          return <code key={i} className="chat-inline-code">{token.slice(1, -1)}</code>;
-        }
-        return <React.Fragment key={i}>{token}</React.Fragment>;
-      })}
-    </>
-  );
-};
 
 export default ChatMessageComponent;

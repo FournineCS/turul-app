@@ -1,6 +1,6 @@
 {
   "name": "turul-app",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "Open-source multi-cloud resource analyzer for AWS and GCP",
   "repository": {
     "type": "git",
@@ -37,6 +37,8 @@
   "author": "Fournine Cloud <info@fourninecloud.com>",
   "license": "Apache-2.0",
   "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.2.98",
+    "@anthropic-ai/sdk": "^0.87.0",
     "@aws-sdk/client-accessanalyzer": "^3.997.0",
     "@aws-sdk/client-acm": "^3.998.0",
     "@aws-sdk/client-amplify": "^3.999.0",
@@ -197,6 +199,8 @@
     "@google-cloud/translate": "^6.3.1",
     "@google-cloud/vision": "^4.3.3",
     "@google-cloud/workflows": "^3.4.1",
+    "@google/generative-ai": "^0.24.1",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@xyflow/react": "^12.10.1",
     "aws-react-icons": "^3.2.0",
     "better-sqlite3": "^12.8.0",
@@ -207,11 +211,15 @@
     "google-auth-library": "^10.6.1",
     "googleapis": "^171.4.0",
     "html-to-image": "^1.11.13",
+    "openai": "^6.34.0",
     "pdfkit": "^0.15.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-markdown": "^10.1.0",
     "react-router-dom": "^6.22.0",
+    "remark-gfm": "^4.0.1",
     "uuid": "^9.0.1",
+    "zod": "^4.3.6",
     "zustand": "^4.5.0"
   },
   "devDependencies": {
