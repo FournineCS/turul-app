@@ -25,7 +25,10 @@ import type {
 import { DatabaseManager } from '../database/db-manager';
 import { getGCPAuthManager } from '../gcp/auth-manager';
 import { resetGCPClientFactory } from '../gcp/client-factory';
-import { getGCPProjectManager } from '../gcp/project-manager';
+import { setActiveGCPProject, activateFirstAvailableProject, getActiveGCPAccountId } from '../gcp/auth-factory';
+import type { GCPCredentialManager } from '../gcp/credential-manager';
+import type { GCPAccountSummary } from '../../shared/types';
+import { getGCPProjectManager, resetGCPProjectManager } from '../gcp/project-manager';
 import { getGCPScanOrchestrator } from '../scanning/gcp-scan-orchestrator';
 import { getGCPCostAnalysis, getGCPOrgCostAnalysis, getGCPCostRecommendations, clearBillingTableCache } from '../gcp/cost/billing-analysis';
 import { getExpandedCostRecommendations, getExpandedCostRecommendationsOrgWide } from '../gcp/cost/recommender-expanded';
@@ -80,7 +83,7 @@ import type {
   GCPComplianceSummary,
 } from '../../shared/types';
 
-export function registerGCPHandlers(dbManager: DatabaseManager): void {
+export function registerGCPHandlers(dbManager: DatabaseManager, gcpCredentialManager: GCPCredentialManager): void {
   // Auth handlers
   ipcMain.handle('gcp:check-auth', async (): Promise<IpcResponse<{ authenticated: boolean; email?: string }>> => {
     try {
@@ -93,28 +96,128 @@ export function registerGCPHandlers(dbManager: DatabaseManager): void {
     }
   });
 
-  ipcMain.handle('gcp:logout', async (): Promise<IpcResponse<void>> => {
+  ipcMain.handle('gcp:logout', async (_, accountId?: string): Promise<IpcResponse<void>> => {
     try {
       requireAuth();
       const authManager = getGCPAuthManager();
-      await authManager.logout();
+      await authManager.logout(accountId);
       resetGCPClientFactory();
+      resetGCPProjectManager();
       return { success: true, data: undefined };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
   });
 
-  ipcMain.handle('gcp:login', async (): Promise<IpcResponse<{ success: boolean }>> => {
+  ipcMain.handle('gcp:login', async (_, label?: string): Promise<IpcResponse<{ success: boolean; accountId?: string; email?: string }>> => {
     try {
       requireAuth();
       const authManager = getGCPAuthManager();
-      const result = await authManager.loginWithADC();
+      const result = await authManager.loginWithADC(undefined, label);
       if (result.success) {
         resetGCPClientFactory();
-        return { success: true, data: { success: true } };
+        resetGCPProjectManager();
+        return { success: true, data: { success: true, accountId: result.accountId, email: result.email } };
       }
       return { success: false, error: result.error };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+
+  // ── GCP Account management ──
+
+  ipcMain.handle('gcp:accounts:list', async (): Promise<IpcResponse<GCPAccountSummary[]>> => {
+    try {
+      requireAuth();
+      return { success: true, data: gcpCredentialManager.listCredentials() };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+
+  ipcMain.handle('gcp:accounts:add', async (_, label: string): Promise<IpcResponse<{ accountId?: string; email?: string }>> => {
+    try {
+      requireAuth();
+      const authManager = getGCPAuthManager();
+      const result = await authManager.loginWithADC(undefined, label || 'New Account');
+      if (result.success) {
+        resetGCPClientFactory();
+        resetGCPProjectManager();
+        return { success: true, data: { accountId: result.accountId, email: result.email } };
+      }
+      return { success: false, error: result.error };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+
+  ipcMain.handle('gcp:accounts:activate', async (_, accountId: string): Promise<IpcResponse<void>> => {
+    try {
+      requireAuth();
+      setActiveGCPProject(accountId);
+      resetGCPClientFactory();
+      resetGCPProjectManager();
+      return { success: true, data: undefined };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+
+  ipcMain.handle('gcp:accounts:rename', async (_, accountId: string, label: string): Promise<IpcResponse<void>> => {
+    try {
+      requireAuth();
+      gcpCredentialManager.updateLabel(accountId, label);
+      return { success: true, data: undefined };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+
+  ipcMain.handle('gcp:accounts:delete', async (_, accountId: string): Promise<IpcResponse<void>> => {
+    try {
+      requireAuth();
+      gcpCredentialManager.deleteCredentials(accountId);
+      // If the deleted account was the active one, reset auth
+      if (getActiveGCPAccountId() === accountId) {
+        const { resetActiveGCPAuth } = require('../gcp/auth-factory');
+        resetActiveGCPAuth();
+        resetGCPClientFactory();
+        resetGCPProjectManager();
+      }
+      return { success: true, data: undefined };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+
+  ipcMain.handle('gcp:accounts:relogin', async (_, accountId: string): Promise<IpcResponse<{ email?: string }>> => {
+    try {
+      requireAuth();
+      const authManager = getGCPAuthManager();
+      // Fetch existing label to preserve it
+      const accounts = gcpCredentialManager.listCredentials();
+      const existing = accounts.find(a => a.accountId === accountId);
+      const result = await authManager.loginWithADC(accountId, existing?.label);
+      if (result.success) {
+        resetGCPClientFactory();
+        resetGCPProjectManager();
+        return { success: true, data: { email: result.email } };
+      }
+      return { success: false, error: result.error };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+
+  // Keep legacy activate-project handler for backward compat
+  ipcMain.handle('gcp:activate-project', async (_, accountId: string): Promise<IpcResponse<void>> => {
+    try {
+      requireAuth();
+      setActiveGCPProject(accountId);
+      resetGCPClientFactory();
+      resetGCPProjectManager();
+      return { success: true, data: undefined };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
@@ -124,6 +227,8 @@ export function registerGCPHandlers(dbManager: DatabaseManager): void {
   ipcMain.handle('gcp:list-projects', async (): Promise<IpcResponse<GCPProject[]>> => {
     try {
       requireAuth();
+      // Ensure some credentials are active so @google-cloud/* SDK clients can authenticate
+      activateFirstAvailableProject();
       const projectManager = getGCPProjectManager();
       const projects = await projectManager.getProjects();
       return { success: true, data: projects };
@@ -135,6 +240,7 @@ export function registerGCPHandlers(dbManager: DatabaseManager): void {
   ipcMain.handle('gcp:list-organizations', async (): Promise<IpcResponse<GCPOrganization[]>> => {
     try {
       requireAuth();
+      activateFirstAvailableProject();
       const projectManager = getGCPProjectManager();
       const orgs = await projectManager.getOrganizations();
       return { success: true, data: orgs };

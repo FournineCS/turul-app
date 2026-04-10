@@ -18,6 +18,9 @@ import { registerAWSHandlers } from './aws-handlers';
 import { registerResourceHandlers } from './resource-handlers';
 import { registerAppHandlers } from './app-handlers';
 import { registerChatHandlers } from './chat-handlers';
+import { GCPCredentialManager } from '../gcp/credential-manager';
+import { getGCPAuthManager } from '../gcp/auth-manager';
+import { setGCPCredentialManagerRef } from '../gcp/auth-factory';
 
 // Module-level references for auth and profile managers
 let authServiceInstance: AuthService | null = null;
@@ -54,9 +57,13 @@ export function registerIpcHandlers(dbManager: DatabaseManager): void {
   registerProfileHandlers(appProfileManagerInstance, authServiceInstance);
   registerAWSHandlers(dbManager, authServiceInstance, appProfileManagerInstance);
 
-  // GCP handlers
+  // GCP handlers + credential manager
+  const gcpCredentialManager = new GCPCredentialManager(dbManager, authServiceInstance);
+  setGCPCredentialManagerRef(gcpCredentialManager);
+  getGCPAuthManager().setCredentialManager(gcpCredentialManager);
+
   const { registerGCPHandlers } = require('./gcp-handlers');
-  registerGCPHandlers(dbManager);
+  registerGCPHandlers(dbManager, gcpCredentialManager);
 
   // Provider-agnostic handlers
   registerResourceHandlers(dbManager);

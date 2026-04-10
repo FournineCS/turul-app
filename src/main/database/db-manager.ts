@@ -563,6 +563,35 @@ export class DatabaseManager {
           ALTER TABLE aws_iam_analyses ADD COLUMN user_issues_count INTEGER NOT NULL DEFAULT 0;
         `,
       },
+      {
+        name: '027_gcp_credentials',
+        sql: `
+          CREATE TABLE IF NOT EXISTS gcp_credentials (
+            id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL UNIQUE,
+            label TEXT NOT NULL DEFAULT '',
+            google_email TEXT,
+            encrypted_credentials TEXT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+          );
+          CREATE INDEX IF NOT EXISTS idx_gcp_credentials_project ON gcp_credentials(project_id);
+        `,
+      },
+      {
+        name: '028_migrate_gcp_default_accounts',
+        sql: `
+          -- Convert legacy 'default' and raw project-id keys to UUID-based account keys
+          UPDATE gcp_credentials
+            SET project_id = 'gcp-acct-' || id,
+                label = CASE
+                  WHEN label != '' THEN label
+                  WHEN project_id = 'default' THEN 'Default'
+                  ELSE project_id
+                END
+            WHERE project_id NOT LIKE 'gcp-acct-%';
+        `,
+      },
     ];
 
     const appliedMigrations = (this.db
@@ -1669,8 +1698,14 @@ export class DatabaseManager {
        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP`
     );
 
+    // Prepare GCP credential re-encryption
+    const gcpCreds = this.getAllGCPCredentials();
+    const updateGCPCredStmt = this.db.prepare(
+      `UPDATE gcp_credentials SET encrypted_credentials = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
+    );
+
     const transaction = this.db.transaction(() => {
-      // Re-encrypt all profile secrets
+      // Re-encrypt all AWS profile secrets
       for (const profile of profiles) {
         updateProfileStmt.run(
           reEncrypt(profile.encrypted_access_key_id),
@@ -1678,6 +1713,14 @@ export class DatabaseManager {
           reEncrypt(profile.encrypted_session_token),
           reEncrypt(profile.encrypted_external_id),
           profile.id
+        );
+      }
+
+      // Re-encrypt all GCP credentials
+      for (const cred of gcpCreds) {
+        updateGCPCredStmt.run(
+          reEncrypt(cred.encrypted_credentials),
+          cred.id
         );
       }
 
@@ -1972,6 +2015,45 @@ export class DatabaseManager {
     return this.db.prepare(
       'SELECT * FROM chat_messages WHERE conversation_id = ? ORDER BY created_at ASC'
     ).all(conversationId) as any[];
+  }
+
+  // ── GCP Credential operations ──
+
+  createGCPCredential(projectId: string, encryptedCredentials: string, label?: string, googleEmail?: string): string {
+    if (!this.db) throw new Error('Database not initialized');
+    const id = require('crypto').randomUUID();
+    this.db.prepare(
+      `INSERT INTO gcp_credentials (id, project_id, label, google_email, encrypted_credentials)
+       VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT(project_id) DO UPDATE SET
+         encrypted_credentials = excluded.encrypted_credentials,
+         label = excluded.label,
+         google_email = excluded.google_email,
+         updated_at = CURRENT_TIMESTAMP`
+    ).run(id, projectId, label || '', googleEmail || null, encryptedCredentials);
+    return id;
+  }
+
+  getGCPCredentialByProjectId(projectId: string): { id: string; project_id: string; label: string; google_email: string | null; encrypted_credentials: string; created_at: string; updated_at: string } | null {
+    if (!this.db) throw new Error('Database not initialized');
+    return this.db.prepare('SELECT * FROM gcp_credentials WHERE project_id = ?').get(projectId) as any || null;
+  }
+
+  getAllGCPCredentials(): Array<{ id: string; project_id: string; label: string; google_email: string | null; encrypted_credentials: string; created_at: string; updated_at: string }> {
+    if (!this.db) throw new Error('Database not initialized');
+    return this.db.prepare('SELECT * FROM gcp_credentials ORDER BY updated_at DESC').all() as any[];
+  }
+
+  deleteGCPCredential(projectId: string): void {
+    if (!this.db) throw new Error('Database not initialized');
+    this.db.prepare('DELETE FROM gcp_credentials WHERE project_id = ?').run(projectId);
+  }
+
+  updateGCPCredentialLabel(projectId: string, label: string): void {
+    if (!this.db) throw new Error('Database not initialized');
+    this.db.prepare(
+      'UPDATE gcp_credentials SET label = ?, updated_at = CURRENT_TIMESTAMP WHERE project_id = ?'
+    ).run(label, projectId);
   }
 
   close(): void {

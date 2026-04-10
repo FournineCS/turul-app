@@ -16,6 +16,14 @@ export interface GCPOrganization {
   displayName: string;
 }
 
+export interface GCPAccountSummary {
+  accountId: string;
+  label: string;
+  googleEmail: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type GCPServiceType =
   // Compute & Containers
   | 'gce'

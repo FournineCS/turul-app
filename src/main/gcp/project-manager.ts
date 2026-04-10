@@ -228,3 +228,8 @@ export function getGCPProjectManager(): GCPProjectManager {
   }
   return projectManagerInstance;
 }
+
+/** Reset the singleton so a fresh client (with updated credentials) is created on next use */
+export function resetGCPProjectManager(): void {
+  projectManagerInstance = null;
+}

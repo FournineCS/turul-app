@@ -41,6 +41,8 @@ import GlobalProfileSelector from './components/GlobalProfileSelector';
 import { useSettingsStore } from './stores/settingsStore';
 import ChangePasswordModal from './components/auth/ChangePasswordModal';
 import ManageProfilesModal from './components/profiles/ManageProfilesModal';
+import ManageGCPAccountsModal from './components/gcp/ManageGCPAccountsModal';
+import { useGCPProjectStore } from './stores/gcpProjectStore';
 import './styles/auth.css';
 import './styles/profiles.css';
 import './styles/chat.css';
@@ -264,6 +266,7 @@ const AppContent: React.FC = () => {
   const isAws = selectedProvider === 'aws';
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   const [isManageProfilesOpen, setIsManageProfilesOpen] = useState(false);
+  const [isManageGCPAccountsOpen, setIsManageGCPAccountsOpen] = useState(false);
   const [isTourOpen, setIsTourOpen] = useState(false);
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
 
@@ -442,6 +445,16 @@ const AppContent: React.FC = () => {
               <span>Manage Profiles</span>
             </button>
           )}
+          {!isAws && (
+            <button
+              className="sidebar-footer-btn"
+              onClick={() => setIsManageGCPAccountsOpen(true)}
+              title="Manage GCP Accounts"
+            >
+              <SettingsIcon />
+              <span>Manage Accounts</span>
+            </button>
+          )}
           <button
             className="sidebar-footer-btn"
             onClick={() => setIsChangePasswordOpen(true)}
@@ -463,7 +476,7 @@ const AppContent: React.FC = () => {
 
       <main className="main-content">
         <div className="top-bar">
-          <GlobalProfileSelector />
+          <GlobalProfileSelector onManageGCPAccounts={() => setIsManageGCPAccountsOpen(true)} />
           <div className="top-bar-actions">
             <ThemeToggleButton />
             <button
@@ -539,6 +552,16 @@ const AppContent: React.FC = () => {
         onClose={() => setIsManageProfilesOpen(false)}
         allProfiles={profiles}
         onProfilesChanged={handleProfilesChanged}
+      />
+      <ManageGCPAccountsModal
+        isOpen={isManageGCPAccountsOpen}
+        onClose={() => setIsManageGCPAccountsOpen(false)}
+        onAccountsChanged={() => {
+          // Trigger project list refresh after account changes
+          const { loadProjects, loadOrganizations } = useGCPProjectStore.getState();
+          loadProjects();
+          loadOrganizations();
+        }}
       />
       {location.pathname !== '/chat' && <ChatFab />}
       {location.pathname !== '/chat' && <ChatPanel />}

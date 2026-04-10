@@ -94,13 +94,16 @@ export class EnvironmentChecker {
             : join(homedir(), '.config', 'gcloud', 'application_default_credentials.json');
 
           const hasADC = existsSync(adcPath);
+          // Also check for app-stored encrypted credentials
+          const hasStoredCreds = !!process.env.GOOGLE_APPLICATION_CREDENTIALS;
 
+          const isAuthenticated = hasADC || hasStoredCreds;
           resolve({
             id: 'gcloud',
             name: 'Google Cloud SDK',
-            status: hasADC ? 'ok' : 'warning',
+            status: isAuthenticated ? 'ok' : 'warning',
             version,
-            details: hasADC ? 'Installed and authenticated' : 'Installed but not authenticated (run gcloud auth application-default login)',
+            details: isAuthenticated ? 'Installed and authenticated' : 'Installed but not authenticated (login via Turul or run gcloud auth application-default login)',
             installUrl: 'https://cloud.google.com/sdk/docs/install',
             required: false,
           });

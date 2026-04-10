@@ -51,6 +51,7 @@ import type {
   ScanDiffResult,
   GCPProject,
   GCPOrganization,
+  GCPAccountSummary,
   GCPScanConfig,
   GCPServiceDiscoveryResult,
   GCPCostFilters,
@@ -492,10 +493,12 @@ const electronAPI = {
   gcp: {
     checkAuth: (): Promise<IpcResponse<{ authenticated: boolean; email?: string }>> =>
       ipcRenderer.invoke('gcp:check-auth'),
-    login: (): Promise<IpcResponse<{ success: boolean }>> =>
-      ipcRenderer.invoke('gcp:login'),
-    logout: (): Promise<IpcResponse<void>> =>
-      ipcRenderer.invoke('gcp:logout'),
+    login: (label?: string): Promise<IpcResponse<{ success: boolean; accountId?: string; email?: string }>> =>
+      ipcRenderer.invoke('gcp:login', label),
+    logout: (accountId?: string): Promise<IpcResponse<void>> =>
+      ipcRenderer.invoke('gcp:logout', accountId),
+    activateProject: (accountId: string): Promise<IpcResponse<void>> =>
+      ipcRenderer.invoke('gcp:activate-project', accountId),
     listProjects: (): Promise<IpcResponse<GCPProject[]>> =>
       ipcRenderer.invoke('gcp:list-projects'),
     listOrganizations: (): Promise<IpcResponse<GCPOrganization[]>> =>
@@ -794,6 +797,21 @@ const electronAPI = {
       exportPdf: (data: { recs: GCPExpandedRecommendationsResult | null; vms: StoppedVMResult | null; idle: ResourceIdleAnalysisResult | null }, label: string): Promise<IpcResponse<string | null>> =>
         ipcRenderer.invoke('gcp:opt:export-pdf', data, label),
     },
+  },
+  // GCP Account management
+  gcpAccounts: {
+    list: (): Promise<IpcResponse<GCPAccountSummary[]>> =>
+      ipcRenderer.invoke('gcp:accounts:list'),
+    add: (label: string): Promise<IpcResponse<{ accountId?: string; email?: string }>> =>
+      ipcRenderer.invoke('gcp:accounts:add', label),
+    activate: (accountId: string): Promise<IpcResponse<void>> =>
+      ipcRenderer.invoke('gcp:accounts:activate', accountId),
+    rename: (accountId: string, label: string): Promise<IpcResponse<void>> =>
+      ipcRenderer.invoke('gcp:accounts:rename', accountId, label),
+    delete: (accountId: string): Promise<IpcResponse<void>> =>
+      ipcRenderer.invoke('gcp:accounts:delete', accountId),
+    relogin: (accountId: string): Promise<IpcResponse<{ email?: string }>> =>
+      ipcRenderer.invoke('gcp:accounts:relogin', accountId),
   },
   // Environment Health
   health: {

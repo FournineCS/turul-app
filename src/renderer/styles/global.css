@@ -411,6 +411,9 @@ input, select, textarea {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .global-profile-label {
@@ -419,6 +422,7 @@ input, select, textarea {
   color: var(--color-text-muted);
   white-space: nowrap;
   letter-spacing: 0.02em;
+  flex-shrink: 0;
 }
 
 .global-profile-select {
@@ -430,7 +434,10 @@ input, select, textarea {
   font-size: 13px;
   font-family: var(--font-mono);
   cursor: pointer;
-  min-width: 200px;
+  min-width: 100px;
+  max-width: 280px;
+  flex: 1;
+  text-overflow: ellipsis;
   transition: border-color var(--transition);
 }
 

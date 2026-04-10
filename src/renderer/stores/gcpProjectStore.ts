@@ -23,9 +23,8 @@ interface GCPProjectState {
   loadProjects: () => Promise<void>;
   setSelectedProjectId: (projectId: string) => void;
   validateProject: (projectId: string) => Promise<GCPProject | null>;
-  checkAuth: () => Promise<boolean>;
-  login: () => Promise<boolean>;
-  logout: () => Promise<void>;
+  setAuthenticated: (value: boolean) => void;
+  resetProjectState: () => void;
   loadOrganizations: () => Promise<void>;
   setSelectedOrgId: (orgId: string | null) => void;
   loadBillingConfig: () => Promise<void>;
@@ -42,54 +41,21 @@ export const useGCPProjectStore = create<GCPProjectState>((set, get) => ({
   isAuthenticated: false,
   error: null,
 
-  checkAuth: async () => {
-    try {
-      const result = await window.electronAPI.gcp.checkAuth();
-      if (result.success && result.data?.authenticated) {
-        set({ isAuthenticated: true, error: null });
-        return true;
-      }
-      set({ isAuthenticated: false, error: result.data?.error || result.error || null });
-      return false;
-    } catch (error) {
-      set({ isAuthenticated: false, error: String(error) });
-      return false;
-    }
+  setAuthenticated: (value: boolean) => {
+    set({ isAuthenticated: value });
   },
 
-  login: async () => {
-    try {
-      set({ isLoading: true, error: null });
-      const result = await window.electronAPI.gcp.login();
-      if (result.success) {
-        set({ isAuthenticated: true, isLoading: false });
-        return true;
-      }
-      set({ isLoading: false, error: result.error || 'Login failed' });
-      return false;
-    } catch (error) {
-      set({ isLoading: false, error: String(error) });
-      return false;
-    }
-  },
-
-  logout: async () => {
-    try {
-      set({ isLoading: true });
-      await window.electronAPI.gcp.logout();
-      set({
-        isAuthenticated: false,
-        projects: [],
-        selectedProjectId: null,
-        organizations: [],
-        selectedOrgId: null,
-        billingConfig: null,
-        isLoading: false,
-        error: null,
-      });
-    } catch (error) {
-      set({ isLoading: false, error: String(error) });
-    }
+  resetProjectState: () => {
+    set({
+      isAuthenticated: false,
+      projects: [],
+      selectedProjectId: null,
+      organizations: [],
+      selectedOrgId: null,
+      billingConfig: null,
+      isLoading: false,
+      error: null,
+    });
   },
 
   loadProjects: async () => {

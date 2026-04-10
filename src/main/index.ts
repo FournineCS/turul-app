@@ -30,6 +30,9 @@ import { DatabaseManager } from './database/db-manager';
 import { initScheduler, getScheduler } from './scanning/scan-scheduler';
 import { getEnvironmentChecker } from './health/environment-checker';
 import { setGcloudResolverDB } from './gcp/gcloud-resolver';
+import { GCPCredentialManager } from './gcp/credential-manager';
+import { getGCPAuthManager } from './gcp/auth-manager';
+import { setGCPCredentialManagerRef, cleanupAllTempCredFiles } from './gcp/auth-factory';
 
 let mainWindow: BrowserWindow | null = null;
 let dbManager: DatabaseManager | null = null;
@@ -171,6 +174,7 @@ app.on('activate', () => {
 
 app.on('before-quit', () => {
   getScheduler()?.stop();
+  cleanupAllTempCredFiles();
   dbManager?.close();
 });
 

@@ -5,8 +5,13 @@ import React, { useEffect } from 'react';
 import { useProfileStore } from '../stores/profileStore';
 import { useProviderStore } from '../stores/providerStore';
 import { useGCPProjectStore } from '../stores/gcpProjectStore';
+import { useGCPAccountStore } from '../stores/gcpAccountStore';
 
-const GlobalProfileSelector: React.FC = () => {
+interface GlobalProfileSelectorProps {
+  onManageGCPAccounts?: () => void;
+}
+
+const GlobalProfileSelector: React.FC<GlobalProfileSelectorProps> = ({ onManageGCPAccounts }) => {
   const { profiles, selectedProfileName, setSelectedProfileName } = useProfileStore();
   const { selectedProvider } = useProviderStore();
   const {
@@ -14,23 +19,30 @@ const GlobalProfileSelector: React.FC = () => {
     selectedProjectId,
     organizations,
     selectedOrgId,
-    isAuthenticated,
     isLoading,
     error,
     loadProjects,
     loadOrganizations,
     setSelectedProjectId,
     setSelectedOrgId,
-    checkAuth,
-    login,
-    logout,
+    setAuthenticated,
   } = useGCPProjectStore();
+  const {
+    accounts,
+    selectedAccountId,
+    isLoading: accountLoading,
+    loadAccounts,
+    addAccount,
+    activateAccount,
+  } = useGCPAccountStore();
 
-  // When switching to GCP, check auth and load projects + orgs
+  // When switching to GCP, load accounts + projects
   useEffect(() => {
     if (selectedProvider === 'gcp') {
-      checkAuth().then((authed) => {
-        if (authed) {
+      loadAccounts().then(() => {
+        const { accounts: accts, selectedAccountId: selId } = useGCPAccountStore.getState();
+        if (accts.length > 0 && selId) {
+          setAuthenticated(true);
           loadProjects();
           loadOrganizations();
         }
@@ -38,17 +50,26 @@ const GlobalProfileSelector: React.FC = () => {
     }
   }, [selectedProvider]);
 
-  const handleGCPLogin = async () => {
-    const success = await login();
+  const handleAccountChange = async (accountId: string) => {
+    await activateAccount(accountId);
+    setAuthenticated(true);
+    // Reload projects for the new account
+    loadProjects();
+    loadOrganizations();
+  };
+
+  const handleAddAccount = async () => {
+    const label = 'New Account';
+    const success = await addAccount(label);
     if (success) {
-      await loadProjects();
-      await loadOrganizations();
+      setAuthenticated(true);
+      loadProjects();
+      loadOrganizations();
     }
   };
 
   return (
     <div className="global-profile-selector" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-      {/* Context Dropdown */}
       {selectedProvider === 'aws' ? (
         <>
           <label className="global-profile-label">Profile:</label>
@@ -73,10 +94,10 @@ const GlobalProfileSelector: React.FC = () => {
         </>
       ) : (
         <>
-          {!isAuthenticated ? (
+          {accounts.length === 0 ? (
             <button
-              onClick={handleGCPLogin}
-              disabled={isLoading}
+              onClick={handleAddAccount}
+              disabled={accountLoading}
               style={{
                 padding: '3px 12px',
                 fontSize: '12px',
@@ -84,13 +105,29 @@ const GlobalProfileSelector: React.FC = () => {
                 border: '1px solid #4285f4',
                 background: '#4285f4',
                 color: '#fff',
-                cursor: isLoading ? 'not-allowed' : 'pointer',
+                cursor: accountLoading ? 'not-allowed' : 'pointer',
               }}
             >
-              {isLoading ? 'Authenticating...' : 'Login with gcloud'}
+              {accountLoading ? 'Authenticating...' : 'Add GCP Account'}
             </button>
           ) : (
             <>
+              {/* Account selector */}
+              <label className="global-profile-label">Account:</label>
+              <select
+                className="global-profile-select"
+                value={selectedAccountId || ''}
+                onChange={(e) => handleAccountChange(e.target.value)}
+                style={{ maxWidth: 200 }}
+              >
+                <option value="">Select account...</option>
+                {accounts.map((acct) => (
+                  <option key={acct.accountId} value={acct.accountId}>
+                    {acct.label || 'Unnamed'}{acct.googleEmail ? ` (${acct.googleEmail})` : ''}
+                  </option>
+                ))}
+              </select>
+
               {/* Organization selector (optional) */}
               {organizations.length > 0 && (
                 <>
@@ -135,7 +172,7 @@ const GlobalProfileSelector: React.FC = () => {
                 )}
               </select>
               {/* Retry button + error when projects failed to load */}
-              {!isLoading && projects.length === 0 && isAuthenticated && (
+              {!isLoading && projects.length === 0 && selectedAccountId && (
                 <>
                   <button
                     onClick={() => loadProjects()}
@@ -161,32 +198,25 @@ const GlobalProfileSelector: React.FC = () => {
                 </>
               )}
 
-              {/* Switch Account / Logout */}
-              <button
-                onClick={async () => {
-                  await logout();
-                  // Immediately trigger re-login with different account
-                  const success = await login();
-                  if (success) {
-                    await loadOrganizations();
-                    await loadProjects();
-                  }
-                }}
-                disabled={isLoading}
-                title="Logout and switch to a different Google account"
-                style={{
-                  padding: '3px 10px',
-                  fontSize: '11px',
-                  borderRadius: '4px',
-                  border: '1px solid #666',
-                  background: 'transparent',
-                  color: '#ccc',
-                  cursor: isLoading ? 'not-allowed' : 'pointer',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                Switch Account
-              </button>
+              {/* Manage Accounts button */}
+              {onManageGCPAccounts && (
+                <button
+                  onClick={onManageGCPAccounts}
+                  title="Manage GCP accounts"
+                  style={{
+                    padding: '3px 10px',
+                    fontSize: '11px',
+                    borderRadius: '4px',
+                    border: '1px solid #666',
+                    background: 'transparent',
+                    color: '#ccc',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  Manage
+                </button>
+              )}
             </>
           )}
         </>
