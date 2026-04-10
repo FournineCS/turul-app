@@ -38,6 +38,7 @@ import { DatabaseManager } from './database/db-manager';
 import { initScheduler, getScheduler } from './scanning/scan-scheduler';
 import { getEnvironmentChecker } from './health/environment-checker';
 import { setGcloudResolverDB } from './gcp/gcloud-resolver';
+import { setClaudeResolverDB, ensureClaudeOnPath } from './ai/claude-resolver';
 import { GCPCredentialManager } from './gcp/credential-manager';
 import { getGCPAuthManager } from './gcp/auth-manager';
 import { setGCPCredentialManagerRef, cleanupAllTempCredFiles } from './gcp/auth-factory';
@@ -53,6 +54,9 @@ async function initServices() {
     dbManager = new DatabaseManager();
     await dbManager.initialize();
     setGcloudResolverDB(dbManager);
+    setClaudeResolverDB(dbManager);
+    // Pre-resolve claude path and add to PATH early so the SDK can find it
+    ensureClaudeOnPath();
   }
   if (!ipcRegistered) {
     registerIpcHandlers(dbManager);

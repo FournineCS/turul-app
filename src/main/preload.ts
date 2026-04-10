@@ -458,6 +458,8 @@ const electronAPI = {
       ipcRenderer.invoke('settings:get-all-app'),
     clearGcloudCache: (): Promise<void> =>
       ipcRenderer.invoke('settings:clear-gcloud-cache'),
+    clearClaudeCache: (): Promise<void> =>
+      ipcRenderer.invoke('settings:clear-claude-cache'),
   },
 
   // Tag Governance

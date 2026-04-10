@@ -3,32 +3,10 @@
 
 import os from 'os';
 import path from 'path';
-import fs from 'fs';
 import { spawn } from 'child_process';
 import type { AIProvider } from '../ai-provider';
 import type { AIStreamChunk, AIChatRequest, AIProviderType, ChatContext } from '../../../shared/types/chat';
-
-/** Resolve the Claude CLI binary path — check common install locations */
-function resolveClaudePath(hint?: string): string {
-  if (hint && hint !== 'claude') return hint;
-
-  const home = os.homedir();
-  const candidates = [
-    path.join(home, '.claude', 'local', 'claude'),
-    '/usr/local/bin/claude',
-    '/opt/homebrew/bin/claude',
-    path.join(home, '.npm-global', 'bin', 'claude'),
-  ];
-
-  for (const p of candidates) {
-    try {
-      if (fs.existsSync(p)) return p;
-    } catch { /* skip */ }
-  }
-
-  // Fall back to bare name (rely on PATH)
-  return 'claude';
-}
+import { resolveClaudePath, ensureClaudeOnPath } from '../claude-resolver';
 
 /**
  * Claude Code local provider using the Claude Agent SDK.
@@ -41,20 +19,19 @@ export class ClaudeCodeProvider implements AIProvider {
   id: AIProviderType = 'claude-code';
   name = 'Claude Code (Local)';
 
-  private cliPath: string;
   private dbPath: string;
   private context: ChatContext | undefined;
 
   constructor(opts: { cliPath?: string; dbPath?: string; context?: ChatContext }) {
-    this.cliPath = resolveClaudePath(opts.cliPath);
     this.dbPath = opts.dbPath || '';
     this.context = opts.context;
   }
 
   async validateConfig(): Promise<{ valid: boolean; error?: string }> {
+    const cliPath = resolveClaudePath();
     return new Promise((resolve) => {
       try {
-        const proc = spawn(this.cliPath, ['--version'], {
+        const proc = spawn(cliPath, ['--version'], {
           timeout: 10000,
           stdio: ['ignore', 'pipe', 'pipe'],
         });
@@ -66,12 +43,12 @@ export class ClaudeCodeProvider implements AIProvider {
           if (code === 0 && stdout.trim()) {
             resolve({ valid: true });
           } else {
-            resolve({ valid: false, error: 'Claude CLI not found. Make sure Claude Code is installed.' });
+            resolve({ valid: false, error: `Claude CLI not found at "${cliPath}". Configure the path in Settings > CLI Tool Paths.` });
           }
         });
 
         proc.on('error', (err: Error) => {
-          resolve({ valid: false, error: `Claude CLI not found: ${err.message}` });
+          resolve({ valid: false, error: `Claude CLI not found: ${err.message}. Configure the path in Settings > CLI Tool Paths.` });
         });
       } catch (err: any) {
         resolve({ valid: false, error: err.message });
@@ -80,6 +57,9 @@ export class ClaudeCodeProvider implements AIProvider {
   }
 
   async *sendMessage(request: AIChatRequest): AsyncGenerator<AIStreamChunk> {
+    // Ensure the claude binary's directory is in PATH before the SDK spawns it
+    ensureClaudeOnPath();
+
     // Dynamically import the SDK (ESM module)
     let queryFn: any;
     try {
@@ -123,6 +103,7 @@ export class ClaudeCodeProvider implements AIProvider {
       console.log('[claude-code] Starting SDK query with MCP server...');
       console.log('[claude-code] Project root:', projectRoot);
       console.log('[claude-code] Node modules:', nodeModulesPath);
+      console.log('[claude-code] PATH includes:', process.env.PATH?.split(':').filter(p => p.includes('claude')).join(', ') || 'none');
 
       const stream = queryFn({
         prompt,

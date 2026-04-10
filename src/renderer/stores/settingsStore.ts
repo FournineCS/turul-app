@@ -12,6 +12,7 @@ export interface AppSettings {
   defaultServices: string[];
   dataRetentionDays: number;
   gcloudPath: string;
+  claudePath: string;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -21,6 +22,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   defaultServices: ['ec2'],
   dataRetentionDays: 90,
   gcloudPath: '',
+  claudePath: '',
 };
 
 interface SettingsState {
@@ -95,6 +97,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           defaultServices: d['app.defaultServices'] ? JSON.parse(d['app.defaultServices']) : ['ec2'],
           dataRetentionDays: d['app.dataRetentionDays'] ? parseInt(d['app.dataRetentionDays'], 10) : 90,
           gcloudPath: d['app.gcloudPath'] || '',
+          claudePath: d['app.claudePath'] || '',
         };
         applyTheme(s.theme);
         set({ settings: s, isLoading: false });
@@ -136,6 +139,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         ['app.defaultServices', JSON.stringify(settings.defaultServices)],
         ['app.dataRetentionDays', String(settings.dataRetentionDays)],
         ['app.gcloudPath', settings.gcloudPath],
+        ['app.claudePath', settings.claudePath],
       ];
       for (const [k, v] of pairs) {
         const res = await window.electronAPI.settings.set(k, v);

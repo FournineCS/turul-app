@@ -14,6 +14,7 @@ import { encryptToString, decryptFromString } from '../auth/crypto-service';
 import { assertString, assertSafeFileExtension } from './validation';
 import { getEnvironmentChecker } from '../health/environment-checker';
 import { clearGcloudCache } from '../gcp/gcloud-resolver';
+import { clearClaudeCache } from '../ai/claude-resolver';
 
 const ENCRYPTED_SETTINGS = new Set([
   // Legacy bedrock keys (backward compat)
@@ -143,6 +144,7 @@ export function registerAppHandlers(dbManager: DatabaseManager, authService: Aut
         'app.defaultServices',
         'app.dataRetentionDays',
         'app.gcloudPath',
+        'app.claudePath',
       ];
       const result: Record<string, string> = {};
       for (const key of keys) {
@@ -159,6 +161,16 @@ export function registerAppHandlers(dbManager: DatabaseManager, authService: Aut
     try {
       requireAuth();
       clearGcloudCache();
+      return { success: true, data: undefined };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to clear cache' };
+    }
+  });
+
+  ipcMain.handle('settings:clear-claude-cache', async (): Promise<IpcResponse<void>> => {
+    try {
+      requireAuth();
+      clearClaudeCache();
       return { success: true, data: undefined };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Failed to clear cache' };

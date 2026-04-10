@@ -71,8 +71,9 @@ const SettingsPage: React.FC = () => {
       if (selectedProvider === 'gcp') {
         await saveBillingConfig(gcpBQProject, gcpBQDataset, gcpBQRegion);
       }
-      // Clear cached gcloud path so the resolver picks up the new setting
+      // Clear cached CLI paths so resolvers pick up the new settings
       await window.electronAPI?.settings?.clearGcloudCache?.();
+      await window.electronAPI?.settings?.clearClaudeCache?.();
       addToast('success', 'Settings saved successfully');
     } catch (err) {
       addToast('error', `Failed to save settings: ${err instanceof Error ? err.message : String(err)}`);
@@ -350,6 +351,32 @@ const SettingsPage: React.FC = () => {
             </div>
             <p className="text-secondary text-sm" style={{ marginTop: 4 }}>
               Path to the gcloud binary. Auto-detection checks common install locations for your platform.
+            </p>
+          </div>
+
+          <div style={{ marginTop: 16 }}>
+            <label className="form-label">Claude Code CLI Path</label>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', maxWidth: 500 }}>
+              <input
+                type="text"
+                className="form-input"
+                value={local.claudePath}
+                onChange={(e) => setLocal((prev) => ({ ...prev, claudePath: e.target.value }))}
+                placeholder="Auto-detect"
+                style={{ flex: 1 }}
+              />
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={async () => {
+                  const path = await window.electronAPI?.app?.selectFile?.();
+                  if (path) setLocal((prev) => ({ ...prev, claudePath: path }));
+                }}
+              >
+                Browse
+              </button>
+            </div>
+            <p className="text-secondary text-sm" style={{ marginTop: 4 }}>
+              Path to the Claude Code CLI binary. Required for the Claude Code (Local) AI chat provider. Auto-detection checks ~/.local/bin, ~/.claude/local, and common install locations.
             </p>
           </div>
         </div>
