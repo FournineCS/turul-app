@@ -9,7 +9,6 @@ import { BedrockProvider } from './providers/bedrock-provider';
 import { AnthropicProvider } from './providers/anthropic-provider';
 import { OpenAIProvider } from './providers/openai-provider';
 import { GeminiProvider } from './providers/gemini-provider';
-import { ClaudeCodeProvider } from './providers/claude-code-provider';
 import { buildSystemPrompt } from './system-prompt';
 import { getToolDefinitionsForProvider, executeTool } from './tools/tool-registry';
 
@@ -58,12 +57,6 @@ export class AIService {
       const messages = this.buildMessageHistory(dbMessages);
 
       const systemPrompt = buildSystemPrompt(context);
-
-      // Claude Code handles tools internally via MCP — bypass the tool loop
-      if (providerType === 'claude-code') {
-        yield* this.streamClaudeCode(provider, conversationId, messages, systemPrompt, context, abortController);
-        return;
-      }
 
       const tools = getToolDefinitionsForProvider(context?.cloudProvider || 'aws');
 
@@ -212,73 +205,6 @@ export class AIService {
     }
   }
 
-  /**
-   * Stream from Claude Code provider — no tool loop needed.
-   * The SDK + MCP server handle tool execution internally.
-   */
-  private async *streamClaudeCode(
-    provider: AIProvider,
-    conversationId: string,
-    messages: Array<{ role: 'user' | 'assistant'; content: string | Array<{ type: string; [key: string]: unknown }> }>,
-    systemPrompt: string,
-    context?: ChatContext,
-    abortController?: AbortController
-  ): AsyncGenerator<AIStreamChunk> {
-    let assistantText = '';
-
-    const stream = provider.sendMessage({
-      messages,
-      systemPrompt,
-      context,
-      // No tools — Claude Code uses MCP tools internally
-    });
-
-    for await (const chunk of stream) {
-      if (abortController?.signal.aborted) {
-        yield { type: 'done' };
-        return;
-      }
-
-      if (chunk.type === 'text') {
-        assistantText += chunk.text || '';
-        yield chunk;
-      } else if (chunk.type === 'tool_use') {
-        // Pass through for UI visibility
-        yield chunk;
-      } else if (chunk.type === 'tool_result') {
-        // Pass through for UI visibility
-        yield chunk;
-      } else if (chunk.type === 'error') {
-        yield chunk;
-        return;
-      } else if (chunk.type === 'done') {
-        const cleanText = stripThinking(assistantText);
-        if (cleanText) {
-          this.dbManager.addChatMessage({
-            id: crypto.randomUUID(),
-            conversationId,
-            role: 'assistant',
-            content: cleanText,
-          });
-        }
-        yield { type: 'done' };
-        return;
-      }
-    }
-
-    // Stream ended without 'done' chunk
-    const cleanText = stripThinking(assistantText);
-    if (cleanText) {
-      this.dbManager.addChatMessage({
-        id: crypto.randomUUID(),
-        conversationId,
-        role: 'assistant',
-        content: cleanText,
-      });
-    }
-    yield { type: 'done' };
-  }
-
   stopGeneration(conversationId: string): void {
     const controller = this.abortControllers.get(conversationId);
     if (controller) {
@@ -292,7 +218,6 @@ export class AIService {
       { type: 'anthropic', name: 'Anthropic (Claude)', configured: true },
       { type: 'openai', name: 'OpenAI', configured: true },
       { type: 'gemini', name: 'Google Gemini', configured: true },
-      { type: 'claude-code', name: 'Claude Code (Local)', configured: true },
     ];
   }
 
@@ -333,13 +258,6 @@ export class AIService {
         return new GeminiProvider({
           apiKey: config.apiKey,
           modelId: config.model,
-        });
-      }
-      case 'claude-code': {
-        return new ClaudeCodeProvider({
-          cliPath: config?.cliPath,
-          dbPath: this.dbManager.getDbPath(),
-          context,
         });
       }
       default:

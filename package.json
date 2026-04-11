@@ -37,7 +37,6 @@
   "author": "Fournine Cloud <info@fourninecloud.com>",
   "license": "Apache-2.0",
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.2.98",
     "@anthropic-ai/sdk": "^0.87.0",
     "@aws-sdk/client-accessanalyzer": "^3.997.0",
     "@aws-sdk/client-acm": "^3.998.0",
@@ -254,6 +253,11 @@
         ]
       },
       "package.json"
+    ],
+    "asar": true,
+    "asarUnpack": [
+      "dist/main/**",
+      "node_modules/**"
     ],
     "mac": {
       "target": [

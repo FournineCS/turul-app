@@ -144,24 +144,10 @@ export const PROVIDER_CONFIGS: Record<AIProviderType, ProviderConfig> = {
       model: 'gemini-2.5-flash',
     },
   },
-
-  'claude-code': {
-    label: 'Claude Code (Local)',
-    models: [],
-    fields: [
-      {
-        key: 'cliPath',
-        label: 'CLI Path (auto-detected if empty)',
-        type: 'text',
-        placeholder: '/usr/local/bin/claude',
-      },
-    ],
-    defaults: {},
-  },
 };
 
 /** All provider types in display order */
-export const PROVIDER_ORDER: AIProviderType[] = ['bedrock', 'anthropic', 'openai', 'gemini', 'claude-code'];
+export const PROVIDER_ORDER: AIProviderType[] = ['bedrock', 'anthropic', 'openai', 'gemini'];
 
 /** Settings keys that should be encrypted at rest */
 export const ENCRYPTED_PROVIDER_KEYS: Record<string, Set<string>> = {
@@ -169,5 +155,4 @@ export const ENCRYPTED_PROVIDER_KEYS: Record<string, Set<string>> = {
   anthropic: new Set(['apiKey']),
   openai: new Set(['apiKey', 'orgId']),
   gemini: new Set(['apiKey']),
-  'claude-code': new Set(),
 };

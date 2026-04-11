@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-present Fournine Cloud
 
-export type AIProviderType = 'bedrock' | 'anthropic' | 'openai' | 'gemini' | 'claude-code';
+export type AIProviderType = 'bedrock' | 'anthropic' | 'openai' | 'gemini';
 
 export interface ProviderModelDefinition {
   id: string;

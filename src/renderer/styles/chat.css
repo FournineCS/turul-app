@@ -114,7 +114,7 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-height: 320px;
+  max-height: 60vh;
   overflow-y: auto;
 }
 
@@ -779,4 +779,218 @@
   background: var(--color-bg-tertiary);
   border-radius: var(--radius-sm);
   font-family: var(--font-mono);
+}
+
+/* ── MCP Server Config ── */
+.mcp-config {
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.mcp-config-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: none;
+  border: none;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  transition: all var(--transition);
+}
+.mcp-config-toggle:hover {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text);
+}
+
+.mcp-config-toggle-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mcp-config-badge {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--color-success);
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.mcp-config-body {
+  padding: 0 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mcp-config-empty {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  text-align: center;
+  padding: 8px 0;
+}
+
+.mcp-config-error {
+  font-size: 11px;
+  color: var(--color-error);
+  padding: 4px 8px;
+  background: var(--color-error-glow);
+  border-radius: var(--radius-sm);
+}
+
+.mcp-server-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-tertiary);
+}
+
+.mcp-server-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.mcp-server-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mcp-server-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.mcp-server-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mcp-server-tool-count {
+  font-size: 10px;
+  color: var(--color-text-muted);
+  background: var(--color-bg);
+  padding: 1px 6px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.mcp-server-error {
+  font-size: 10px;
+  color: var(--color-error);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mcp-server-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.mcp-server-tools {
+  width: 100%;
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px solid var(--color-border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.mcp-tool-item {
+  display: flex;
+  flex-direction: column;
+  padding: 3px 6px;
+  border-radius: 3px;
+}
+.mcp-tool-item:hover {
+  background: var(--color-bg);
+}
+
+.mcp-tool-name {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--color-primary);
+  font-weight: 500;
+}
+
+.mcp-tool-desc {
+  font-size: 10px;
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mcp-add-btn {
+  width: 100%;
+  padding: 6px 12px;
+  background: none;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-size: 12px;
+  transition: all var(--transition);
+}
+.mcp-add-btn:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+.mcp-add-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+}
+
+.mcp-add-form-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.mcp-textarea {
+  padding: 6px 8px;
+  font-size: 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-tertiary);
+  color: var(--color-text);
+  outline: none;
+  width: 100%;
+  font-family: var(--font-mono);
+  resize: vertical;
+  transition: border-color var(--transition);
+}
+.mcp-textarea:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-primary-glow);
 }

@@ -58,6 +58,9 @@ import type {
   CloudProvider,
   ResourceIdleAnalysisResult,
   GCPOptimizationSnapshot,
+  McpServerConfig,
+  McpServerStatus,
+  McpToolInfo,
   GCPCostCacheEntry,
   EKSCostAnalysis,
   GCPOrgScanProgress,
@@ -458,8 +461,6 @@ const electronAPI = {
       ipcRenderer.invoke('settings:get-all-app'),
     clearGcloudCache: (): Promise<void> =>
       ipcRenderer.invoke('settings:clear-gcloud-cache'),
-    clearClaudeCache: (): Promise<void> =>
-      ipcRenderer.invoke('settings:clear-claude-cache'),
   },
 
   // Tag Governance
@@ -852,6 +853,26 @@ const electronAPI = {
       ipcRenderer.invoke('chat:update-title', id, title),
     getProviders: (profileName?: string): Promise<IpcResponse<any[]>> =>
       ipcRenderer.invoke('chat:get-providers', profileName),
+  },
+
+  // MCP Server Management
+  mcp: {
+    getServers: (): Promise<IpcResponse<McpServerStatus[]>> =>
+      ipcRenderer.invoke('mcp:get-servers'),
+    addServer: (config: Omit<McpServerConfig, 'id'>): Promise<IpcResponse<McpServerStatus>> =>
+      ipcRenderer.invoke('mcp:add-server', config),
+    updateServer: (id: string, updates: Partial<McpServerConfig>): Promise<IpcResponse<McpServerStatus>> =>
+      ipcRenderer.invoke('mcp:update-server', id, updates),
+    removeServer: (id: string): Promise<IpcResponse<void>> =>
+      ipcRenderer.invoke('mcp:remove-server', id),
+    connectServer: (id: string): Promise<IpcResponse<McpServerStatus>> =>
+      ipcRenderer.invoke('mcp:connect-server', id),
+    disconnectServer: (id: string): Promise<IpcResponse<void>> =>
+      ipcRenderer.invoke('mcp:disconnect-server', id),
+    reconnectServer: (id: string): Promise<IpcResponse<McpServerStatus>> =>
+      ipcRenderer.invoke('mcp:reconnect-server', id),
+    getTools: (): Promise<IpcResponse<McpToolInfo[]>> =>
+      ipcRenderer.invoke('mcp:get-tools'),
   },
 
   shell: {

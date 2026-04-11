@@ -6,16 +6,32 @@ try {
   const fixPath = require('fix-path');
   fixPath();
 } catch {
-  // Graceful fallback — append common paths manually
+  // Graceful fallback — append common paths manually including expanded nvm versions
   if (process.platform === 'darwin') {
     const home = process.env.HOME || '';
+    const fs = require('fs') as typeof import('fs');
+
+    // Expand nvm node versions so `node` is findable even when fix-path fails
+    const nvmBins: string[] = [];
+    if (home) {
+      const nvmDir = `${home}/.nvm/versions/node`;
+      try {
+        const versions = fs.readdirSync(nvmDir).sort().reverse(); // latest first
+        for (const ver of versions) {
+          const bin = `${nvmDir}/${ver}/bin`;
+          try { if (fs.statSync(bin).isDirectory()) nvmBins.push(bin); } catch {}
+        }
+      } catch {}
+    }
+
     const extra = [
       '/usr/local/bin',
       '/opt/homebrew/bin',
       '/usr/local/sbin',
       home ? `${home}/.claude/local` : '',
       home ? `${home}/.npm-global/bin` : '',
-      home ? `${home}/.nvm/versions/node/*/bin` : '',
+      home ? `${home}/.volta/bin` : '',
+      ...nvmBins,
     ].filter(Boolean).join(':');
     process.env.PATH = process.env.PATH ? `${process.env.PATH}:${extra}` : extra;
   } else if (process.platform === 'win32') {
@@ -33,15 +49,26 @@ try {
 
 import { app, BrowserWindow, session, shell } from 'electron';
 import path from 'path';
-import { registerIpcHandlers } from './ipc';
+import { registerIpcHandlers, getMcpClientManager } from './ipc';
 import { DatabaseManager } from './database/db-manager';
 import { initScheduler, getScheduler } from './scanning/scan-scheduler';
 import { getEnvironmentChecker } from './health/environment-checker';
 import { setGcloudResolverDB } from './gcp/gcloud-resolver';
-import { setClaudeResolverDB, ensureClaudeOnPath } from './ai/claude-resolver';
 import { GCPCredentialManager } from './gcp/credential-manager';
 import { getGCPAuthManager } from './gcp/auth-manager';
 import { setGCPCredentialManagerRef, cleanupAllTempCredFiles } from './gcp/auth-factory';
+
+// Suppress EPIPE on stdout/stderr — in packaged macOS apps launched from
+// Finder/Dock, these pipes connect to ASL and can break. Without this,
+// any console.log() would throw an uncaught EPIPE and crash the app.
+process.stdout?.on('error', (err: any) => { if (err?.code !== 'EPIPE') throw err; });
+process.stderr?.on('error', (err: any) => { if (err?.code !== 'EPIPE') throw err; });
+
+process.on('uncaughtException', (err) => {
+  if ((err as NodeJS.ErrnoException).code === 'EPIPE') return;
+  // Use process.stderr.write instead of console.error to avoid recursive EPIPE
+  try { process.stderr.write(`[main] Uncaught: ${err.stack || err.message}\n`); } catch {}
+});
 
 let mainWindow: BrowserWindow | null = null;
 let dbManager: DatabaseManager | null = null;
@@ -54,9 +81,6 @@ async function initServices() {
     dbManager = new DatabaseManager();
     await dbManager.initialize();
     setGcloudResolverDB(dbManager);
-    setClaudeResolverDB(dbManager);
-    // Pre-resolve claude path and add to PATH early so the SDK can find it
-    ensureClaudeOnPath();
   }
   if (!ipcRegistered) {
     registerIpcHandlers(dbManager);
@@ -186,6 +210,7 @@ app.on('activate', () => {
 
 app.on('before-quit', () => {
   getScheduler()?.stop();
+  getMcpClientManager()?.shutdown().catch(() => {});
   cleanupAllTempCredFiles();
   dbManager?.close();
 });

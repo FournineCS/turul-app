@@ -18,7 +18,7 @@ export function registerChatHandlers(dbManager: DatabaseManager, authService: Au
       requireAuth();
       const cId   = assertString(conversationId, 'conversationId', 1, 256);
       const msg   = assertString(message, 'message', 1, 100_000);
-      const pType = assertOneOf(providerType, ['bedrock', 'anthropic', 'openai', 'gemini', 'claude-code'] as const, 'providerType');
+      const pType = assertOneOf(providerType, ['bedrock', 'anthropic', 'openai', 'gemini'] as const, 'providerType');
       const ctx   = assertObject(context, 'context');
       const cfg   = assertObject(providerConfig, 'providerConfig');
       let fullText = '';
@@ -119,7 +119,7 @@ export function registerChatHandlers(dbManager: DatabaseManager, authService: Au
     try {
       requireAuth();
       const t = assertString(title, 'title', 1, 200);
-      const p = assertOneOf(provider, ['bedrock', 'anthropic', 'openai', 'gemini', 'claude-code'] as const, 'provider');
+      const p = assertOneOf(provider, ['bedrock', 'anthropic', 'openai', 'gemini'] as const, 'provider');
       const id = crypto.randomUUID();
       dbManager.createConversation(id, t, p);
       const conv = dbManager.getConversation(id)!;

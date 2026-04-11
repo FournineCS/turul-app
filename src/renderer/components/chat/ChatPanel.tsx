@@ -7,6 +7,7 @@ import { PROVIDER_CONFIGS, PROVIDER_ORDER } from '../../../shared/constants/prov
 import type { AIProviderType } from '../../../shared/types/chat';
 import ChatMessageComponent, { stripThinking } from './ChatMessage';
 import ChatInput from './ChatInput';
+import McpServerConfig from './McpServerConfig';
 
 const ChatPanel: React.FC = () => {
   const {
@@ -147,6 +148,8 @@ const ChatPanel: React.FC = () => {
           <button className="chat-settings-save" onClick={handleSaveSettings}>
             {settingsSaved ? '✓ Saved' : 'Save Settings'}
           </button>
+
+          <McpServerConfig />
         </div>
       )}
 

@@ -18,13 +18,17 @@ import { registerAWSHandlers } from './aws-handlers';
 import { registerResourceHandlers } from './resource-handlers';
 import { registerAppHandlers } from './app-handlers';
 import { registerChatHandlers } from './chat-handlers';
+import { registerMcpHandlers } from './mcp-handlers';
+import { McpClientManager } from '../ai/mcp/mcp-client-manager';
+import { setMcpClientManager } from '../ai/tools/tool-registry';
 import { GCPCredentialManager } from '../gcp/credential-manager';
 import { getGCPAuthManager } from '../gcp/auth-manager';
 import { setGCPCredentialManagerRef } from '../gcp/auth-factory';
 
-// Module-level references for auth and profile managers
+// Module-level references for auth, profile, and MCP managers
 let authServiceInstance: AuthService | null = null;
 let appProfileManagerInstance: AppProfileManager | null = null;
+let mcpClientManagerInstance: McpClientManager | null = null;
 
 export function getAuthService(): AuthService | null {
   return authServiceInstance;
@@ -32,6 +36,10 @@ export function getAuthService(): AuthService | null {
 
 export function getAppProfileManager(): AppProfileManager | null {
   return appProfileManagerInstance;
+}
+
+export function getMcpClientManager(): McpClientManager | null {
+  return mcpClientManagerInstance;
 }
 
 export function registerIpcHandlers(dbManager: DatabaseManager): void {
@@ -71,4 +79,12 @@ export function registerIpcHandlers(dbManager: DatabaseManager): void {
 
   // AI Chat handlers
   registerChatHandlers(dbManager, authServiceInstance);
+
+  // MCP client manager + handlers
+  mcpClientManagerInstance = new McpClientManager(dbManager);
+  setMcpClientManager(mcpClientManagerInstance);
+  registerMcpHandlers(mcpClientManagerInstance);
+  mcpClientManagerInstance.loadConfigs().catch((err) => {
+    console.error('[MCP] Failed to load configs on startup:', err);
+  });
 }
