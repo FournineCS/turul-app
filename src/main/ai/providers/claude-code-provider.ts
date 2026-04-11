@@ -70,6 +70,9 @@ export class ClaudeCodeProvider implements AIProvider {
       return;
     }
 
+    // Collect stderr for better error diagnostics
+    const stderrLines: string[] = [];
+
     // Build the last user message from the conversation
     const lastMessage = request.messages[request.messages.length - 1];
     const prompt = typeof lastMessage.content === 'string'
@@ -100,14 +103,16 @@ export class ClaudeCodeProvider implements AIProvider {
     const nodeModulesPath = path.join(projectRoot, 'node_modules');
 
     try {
-      console.log('[claude-code] Starting SDK query with MCP server...');
+      const claudeBin = resolveClaudePath();
+      console.log('[claude-code] Resolved claude binary:', claudeBin);
+      console.log('[claude-code] MCP server path:', mcpServerPath);
       console.log('[claude-code] Project root:', projectRoot);
       console.log('[claude-code] Node modules:', nodeModulesPath);
-      console.log('[claude-code] PATH includes:', process.env.PATH?.split(':').filter(p => p.includes('claude')).join(', ') || 'none');
 
       const stream = queryFn({
         prompt,
         options: {
+          pathToClaudeCodeExecutable: claudeBin !== 'claude' ? claudeBin : undefined,
           systemPrompt: request.systemPrompt,
           cwd: os.tmpdir(),
           maxTurns: 10,
@@ -130,7 +135,10 @@ export class ClaudeCodeProvider implements AIProvider {
             'NotebookEdit', 'TodoWrite', 'AskUserQuestion',
             'ListMcpResourcesTool', 'ReadMcpResourceTool',
           ],
-          stderr: (data: string) => console.error('[claude-code:stderr]', data),
+          stderr: (data: string) => {
+            stderrLines.push(data);
+            console.error('[claude-code:stderr]', data);
+          },
         },
       });
 
@@ -182,7 +190,11 @@ export class ClaudeCodeProvider implements AIProvider {
         }
       }
     } catch (err: any) {
-      yield { type: 'error', error: `Claude Code error: ${err.message}` };
+      const stderrContext = stderrLines.length > 0
+        ? `\n\nClaude stderr:\n${stderrLines.slice(-5).join('\n')}`
+        : '';
+      console.error('[claude-code] Error:', err.message, stderrContext);
+      yield { type: 'error', error: `Claude Code error: ${err.message}${stderrContext}` };
     }
   }
 }
