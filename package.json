@@ -255,10 +255,6 @@
       "package.json"
     ],
     "asar": true,
-    "asarUnpack": [
-      "dist/main/**",
-      "node_modules/**"
-    ],
     "mac": {
       "target": [
         "dmg"
