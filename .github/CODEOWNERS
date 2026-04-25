@@ -1,0 +1,16 @@
+# GitHub CODEOWNERS — anything matching is auto-requested for review.
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default: maintainer reviews everything
+*                               @sampathinturi
+
+# Workflows / CI / release pipeline
+/.github/                       @sampathinturi
+/.github/workflows/             @sampathinturi
+/RELEASING.md                   @sampathinturi
+
+# Security-sensitive surfaces
+/.github/SECURITY.md            @sampathinturi
+/src/main/auth/                 @sampathinturi
+/src/main/ipc/                  @sampathinturi
+/src/main/database/             @sampathinturi

@@ -7,8 +7,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 10
-    reviewers:
-      - "sampathinturi"
+    # Reviewers come from CODEOWNERS — `reviewers` is deprecated.
     labels:
       - "dependencies"
     groups:
@@ -36,7 +35,7 @@ updates:
           - "vite"
           - "@vitejs/*"
 
-  # GitHub Actions
+  # GitHub Actions — keep SHA pins fresh
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
@@ -46,3 +45,14 @@ updates:
     labels:
       - "dependencies"
       - "ci"
+    groups:
+      actions-core:
+        patterns:
+          - "actions/*"
+          - "github/codeql-action"
+    ignore:
+      # v5+ broke the build-artifact merge flow; pinned at v4.x.
+      - dependency-name: "actions/upload-artifact"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "actions/download-artifact"
+        update-types: ["version-update:semver-major"]

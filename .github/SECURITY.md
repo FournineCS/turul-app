@@ -2,10 +2,14 @@
 
 ## Supported Versions
 
+While the project is in `0.x`, only the latest minor release line receives
+security fixes. Once `1.0.0` ships, support will extend to the previous
+minor.
+
 | Version | Supported |
 | ------- | --------- |
-| 1.2.x   | Yes       |
-| < 1.2   | No        |
+| 0.9.x   | Yes       |
+| < 0.9   | No        |
 
 ## Reporting a Vulnerability
 
@@ -43,3 +47,16 @@ Out of scope: social engineering, physical attacks, issues in third-party depend
 - Enable password protection in the app settings
 - Do not share your local database file (`aws-analyzer.db`)
 - Rotate AWS/GCP credentials regularly
+
+## Project Security Posture
+
+- All third-party GitHub Actions are pinned by commit SHA, not by tag
+  (defense against tag-rewrite attacks like
+  [GHSA-69fq-xp46-6x23](https://github.com/advisories/GHSA-69fq-xp46-6x23)).
+- CI runs CodeQL (`security-extended`), Trivy (filesystem + secrets),
+  `npm audit`, dependency-review on every PR, and OSSF Scorecard weekly.
+- Dependabot opens grouped PRs for npm and `github-actions` weekly.
+- `main` is protected: PR + 1 review + green CI, no force-pushes, no
+  deletions, linear history.
+- Releases are gated on signed `v*` tag pushes only — see
+  [RELEASING.md](../RELEASING.md).
