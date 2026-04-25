@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Turul — Privacy-first AWS &amp; GCP analyzer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="description" content="Open-source desktop app for AWS and GCP cloud-resource analysis. 200+ scanners covering cost, security posture, IAM, network reachability, CIS compliance, and Well-Architected — all locally on your laptop." />
+<meta property="og:title" content="Turul — Privacy-first multi-cloud analyzer" />
+<meta property="og:description" content="200+ scanners across AWS and GCP. Local-only, encrypted credentials, no SaaS. Apache-2.0." />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://fourninecs.github.io/turul-app/" />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%231f6feb'/%3E%3Ctext x='32' y='44' font-family='Inter,system-ui,sans-serif' font-size='40' font-weight='700' text-anchor='middle' fill='white'%3ET%3C/text%3E%3C/svg%3E" />
+<style>
+  :root {
+    --bg: #0d1117;
+    --bg-2: #161b22;
+    --bg-3: #1f242c;
+    --border: #30363d;
+    --fg: #e6edf3;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --accent-2: #1f6feb;
+    --green: #3fb950;
+    --maxw: 1080px;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  html, body { background: var(--bg); color: var(--fg); }
+  body {
+    margin: 0;
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code, pre, kbd { font-family: ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, monospace; }
+  code { background: var(--bg-3); padding: 2px 6px; border-radius: 4px; font-size: .9em; }
+
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; }
+
+  header {
+    border-bottom: 1px solid var(--border);
+    background: rgba(13,17,23,.85);
+    backdrop-filter: saturate(180%) blur(8px);
+    position: sticky; top: 0; z-index: 10;
+  }
+  .nav {
+    display: flex; align-items: center; gap: 24px;
+    height: 56px;
+  }
+  .brand {
+    display: flex; align-items: center; gap: 10px;
+    font-weight: 700; color: var(--fg); text-decoration: none;
+  }
+  .brand .logo {
+    width: 26px; height: 26px; border-radius: 6px;
+    background: linear-gradient(135deg, var(--accent-2), var(--accent));
+    display: grid; place-items: center; color: #fff; font-weight: 800;
+  }
+  .nav a.link { color: var(--muted); }
+  .nav a.link:hover { color: var(--fg); text-decoration: none; }
+  .nav .spacer { flex: 1; }
+
+  /* Hero */
+  .hero { padding: 96px 0 64px; text-align: center; }
+  .eyebrow {
+    display: inline-block; padding: 4px 10px; border-radius: 999px;
+    background: var(--bg-2); border: 1px solid var(--border);
+    color: var(--muted); font-size: 13px; margin-bottom: 22px;
+  }
+  .eyebrow .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--green); margin-right: 6px; vertical-align: middle; }
+  h1 {
+    font-size: clamp(34px, 6vw, 60px);
+    line-height: 1.05; letter-spacing: -0.02em; margin: 0 0 16px;
+  }
+  h1 .grad {
+    background: linear-gradient(135deg, var(--accent), #c397ff);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .lede {
+    font-size: clamp(17px, 2vw, 20px);
+    color: var(--muted); max-width: 760px; margin: 0 auto 28px;
+  }
+  .ctas { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 12px 20px; border-radius: 8px; font-weight: 600;
+    border: 1px solid var(--border); background: var(--bg-2); color: var(--fg);
+    transition: transform .08s ease, border-color .15s ease, background .15s ease;
+  }
+  .btn:hover { text-decoration: none; transform: translateY(-1px); border-color: var(--accent); }
+  .btn.primary { background: var(--accent-2); border-color: var(--accent-2); color: #fff; }
+  .btn.primary:hover { background: #2879f0; border-color: #2879f0; }
+  .badges { margin-top: 28px; display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+  .badges img { height: 20px; }
+
+  /* Sections */
+  section { padding: 56px 0; border-top: 1px solid var(--border); }
+  section h2 {
+    font-size: 28px; letter-spacing: -0.01em; margin: 0 0 8px;
+  }
+  section p.kicker {
+    color: var(--muted); margin: 0 0 28px;
+  }
+
+  /* Download grid */
+  .dl-grid {
+    display: grid; gap: 16px;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  }
+  .dl-card {
+    background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 20px; display: flex; flex-direction: column; gap: 6px;
+  }
+  .dl-card h3 { margin: 0; font-size: 16px; }
+  .dl-card p { color: var(--muted); font-size: 13px; margin: 0; }
+  .dl-card .files { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+  .dl-card .files a {
+    display: block; padding: 8px 12px; background: var(--bg-3); border-radius: 6px;
+    font-size: 14px; border: 1px solid transparent;
+  }
+  .dl-card .files a:hover { border-color: var(--accent); text-decoration: none; }
+  .dl-note { color: var(--muted); font-size: 13px; margin-top: 12px; }
+
+  /* Why grid */
+  .compare {
+    width: 100%; border-collapse: collapse; font-size: 14px;
+    background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .compare th, .compare td {
+    padding: 12px 16px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top;
+  }
+  .compare th { background: var(--bg-3); font-weight: 600; }
+  .compare tr:last-child td { border-bottom: none; }
+  .compare td.highlight { color: var(--green); font-weight: 600; }
+
+  /* Features */
+  .feat-grid {
+    display: grid; gap: 16px;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  }
+  .feat {
+    background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 20px;
+  }
+  .feat h3 { margin: 0 0 6px; font-size: 16px; }
+  .feat p { color: var(--muted); font-size: 14px; margin: 0; }
+  .feat .icon {
+    width: 30px; height: 30px; border-radius: 8px;
+    background: linear-gradient(135deg, var(--accent-2), var(--accent));
+    display: grid; place-items: center; color: white; font-weight: 700; margin-bottom: 12px;
+  }
+
+  /* Privacy callout */
+  .privacy {
+    background: linear-gradient(135deg, rgba(31,111,235,.12), rgba(195,151,255,.06));
+    border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 28px;
+  }
+  .privacy h2 { margin-top: 0; }
+  .privacy ul { padding-left: 20px; color: var(--muted); }
+  .privacy li { margin: 6px 0; }
+
+  /* Footer */
+  footer {
+    padding: 40px 0 60px; color: var(--muted); font-size: 14px;
+    border-top: 1px solid var(--border);
+  }
+  footer .row { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
+
+  @media (max-width: 600px) {
+    .hero { padding: 56px 0 32px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap nav">
+    <a class="brand" href="./">
+      <span class="logo">T</span>
+      <span>Turul</span>
+    </a>
+    <a class="link" href="#download">Download</a>
+    <a class="link" href="#why">Why Turul</a>
+    <a class="link" href="#features">Features</a>
+    <a class="link" href="#privacy">Privacy</a>
+    <span class="spacer"></span>
+    <a class="link" href="https://github.com/FournineCS/turul-app" rel="noopener">GitHub →</a>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="wrap">
+    <span class="eyebrow"><span class="dot"></span> v0.9.3 — Apache 2.0</span>
+    <h1>Multi-cloud analysis,<br/><span class="grad">on your laptop. Not in someone else's cloud.</span></h1>
+    <p class="lede">
+      Turul is a desktop app for AWS and GCP. <strong>200+ scanners</strong> across cost,
+      security posture, IAM, network reachability, CIS compliance, and Well-Architected — with
+      built-in AI chat. Credentials live in your OS keychain. The database lives on your machine.
+      Nothing is sent to a third-party SaaS.
+    </p>
+    <div class="ctas">
+      <a class="btn primary" href="#download">Download</a>
+      <a class="btn" href="https://github.com/FournineCS/turul-app" rel="noopener">View on GitHub</a>
+    </div>
+    <div class="badges">
+      <a href="https://github.com/FournineCS/turul-app/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/FournineCS/turul-app/actions/workflows/ci.yml/badge.svg?branch=main" /></a>
+      <a href="https://github.com/FournineCS/turul-app/actions/workflows/codeql.yml"><img alt="CodeQL" src="https://github.com/FournineCS/turul-app/actions/workflows/codeql.yml/badge.svg?branch=main" /></a>
+      <a href="https://scorecard.dev/viewer/?uri=github.com/FournineCS/turul-app"><img alt="OSSF Scorecard" src="https://api.scorecard.dev/projects/github.com/FournineCS/turul-app/badge" /></a>
+      <a href="https://github.com/FournineCS/turul-app/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/FournineCS/turul-app" /></a>
+      <a href="https://github.com/FournineCS/turul-app/blob/main/LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" /></a>
+    </div>
+  </div>
+</section>
+
+<section id="download">
+  <div class="wrap">
+    <h2>Download</h2>
+    <p class="kicker">Latest release: <a href="https://github.com/FournineCS/turul-app/releases/latest">v0.9.3</a> · Pick your platform.</p>
+    <div class="dl-grid">
+      <div class="dl-card">
+        <h3>macOS</h3>
+        <p>11 Big Sur or newer.</p>
+        <div class="files">
+          <a href="https://github.com/FournineCS/turul-app/releases/latest/download/Turul-0.9.3-mac-arm64.dmg">Apple Silicon (.dmg)</a>
+          <a href="https://github.com/FournineCS/turul-app/releases/latest/download/Turul-0.9.3-mac-x64.dmg">Intel (.dmg)</a>
+        </div>
+      </div>
+      <div class="dl-card">
+        <h3>Windows</h3>
+        <p>Windows 10 or newer.</p>
+        <div class="files">
+          <a href="https://github.com/FournineCS/turul-app/releases/latest/download/Turul-0.9.3-win-x64-setup.exe">x64 installer (.exe)</a>
+          <a href="https://github.com/FournineCS/turul-app/releases/latest/download/Turul-0.9.3-win-arm64-setup.exe">ARM64 installer (.exe)</a>
+        </div>
+      </div>
+      <div class="dl-card">
+        <h3>Linux</h3>
+        <p>glibc 2.28+ (Ubuntu 22.04+, Fedora 38+).</p>
+        <div class="files">
+          <a href="https://github.com/FournineCS/turul-app/releases/latest/download/Turul-0.9.3-linux-x64.AppImage">x64 (.AppImage)</a>
+          <a href="https://github.com/FournineCS/turul-app/releases/latest/download/Turul-0.9.3-linux-x64.deb">x64 (.deb)</a>
+          <a href="https://github.com/FournineCS/turul-app/releases/latest/download/Turul-0.9.3-linux-arm64.AppImage">ARM64 (.AppImage)</a>
+          <a href="https://github.com/FournineCS/turul-app/releases/latest/download/Turul-0.9.3-linux-arm64.deb">ARM64 (.deb)</a>
+        </div>
+      </div>
+    </div>
+    <p class="dl-note">macOS builds are not yet notarized — on first launch, right-click the app icon and choose <strong>Open</strong> to bypass Gatekeeper.</p>
+  </div>
+</section>
+
+<section id="why">
+  <div class="wrap">
+    <h2>Why Turul</h2>
+    <p class="kicker">For solo engineers, freelancers, small teams, and regulated environments where data can't leave the laptop.</p>
+    <table class="compare">
+      <thead>
+        <tr>
+          <th></th>
+          <th>Turul</th>
+          <th>SaaS CSPMs (Wiz, Prisma)</th>
+          <th>CLI tools (Steampipe, CloudQuery)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Where data lives</td><td class="highlight">Local SQLite on your laptop</td><td>Vendor cloud</td><td>Local DB / DW (BYO)</td></tr>
+        <tr><td>Setup time</td><td class="highlight">Install installer, point at AWS / gcloud</td><td>Org rollout, cross-account IAM roles</td><td>Install + write SQL</td></tr>
+        <tr><td>UI</td><td class="highlight">Native desktop app</td><td>Web console</td><td>None — bring-your-own</td></tr>
+        <tr><td>Cost analysis</td><td class="highlight">Cost Explorer + GCP Billing + GKE drill-down</td><td>Vendor pricing</td><td>DIY queries</td></tr>
+        <tr><td>Multi-cloud</td><td class="highlight">AWS + GCP</td><td>Yes</td><td>Yes</td></tr>
+        <tr><td>Open source</td><td class="highlight">Apache-2.0</td><td>No</td><td>Apache-2.0 / MPL</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="features">
+  <div class="wrap">
+    <h2>Features</h2>
+    <p class="kicker">Everything an engineer needs to understand a single AWS / GCP environment.</p>
+    <div class="feat-grid">
+      <div class="feat"><div class="icon">A</div><h3>AWS scanning</h3><p>117 service scanners, multi-region, multi-account.</p></div>
+      <div class="feat"><div class="icon">G</div><h3>GCP scanning</h3><p>85 service scanners, multi-project, multi-account.</p></div>
+      <div class="feat"><div class="icon">$</div><h3>Cost analysis</h3><p>Cost Explorer + GCP Billing with trends, forecasts, and GKE cluster / namespace / workload drill-down.</p></div>
+      <div class="feat"><div class="icon">S</div><h3>Security posture</h3><p>Security Hub, SCC, AWS CIS v3 (120+ controls), GCP CIS, best-practice checks.</p></div>
+      <div class="feat"><div class="icon">I</div><h3>IAM analysis</h3><p>Unused roles, overly-permissive policies, cross-account / cross-project trust, service-account keys.</p></div>
+      <div class="feat"><div class="icon">N</div><h3>Network reachability</h3><p>EC2 / RDS via security groups + NACLs, GCP VPC firewall analysis.</p></div>
+      <div class="feat"><div class="icon">W</div><h3>Well-Architected</h3><p>AWS 6-pillar reviews via the WA API; GCP-native 5-pillar checks.</p></div>
+      <div class="feat"><div class="icon">▦</div><h3>Topology diagrams</h3><p>Network, Application, and Data views — plus a full topology graph.</p></div>
+      <div class="feat"><div class="icon">★</div><h3>Assessment scoring</h3><p>Cost / Security / Reliability / Compliance / IAM A–F grades with persisted history.</p></div>
+      <div class="feat"><div class="icon">⌬</div><h3>Tag &amp; label governance</h3><p>9-layer async pipeline for AWS tags and GCP labels.</p></div>
+      <div class="feat"><div class="icon">✦</div><h3>AI chat</h3><p>AWS Bedrock-powered assistant with tool calling over AWS, GCP, and the local DB.</p></div>
+      <div class="feat"><div class="icon">↧</div><h3>Reports</h3><p>PDF, Excel, and CSV export for assessments, costs, and optimization.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="privacy">
+  <div class="wrap">
+    <div class="privacy">
+      <h2>Privacy &amp; security</h2>
+      <ul>
+        <li>Credentials are stored locally, encrypted with <strong>AES-256-GCM</strong>, and protected by a master password (Touch ID supported on macOS).</li>
+        <li>The local SQLite database never leaves your machine.</li>
+        <li>Outbound traffic is limited to AWS / GCP APIs (and AWS Bedrock if you opt into AI chat). <strong>No telemetry, no analytics, no cloud sync.</strong></li>
+        <li>Repository security: branch protection on <code>main</code>, signed-tag releases, CodeQL, OSSF Scorecard, Trivy, dependency review, secret scanning + push protection, all third-party Actions pinned to commit SHAs.</li>
+        <li>Vulnerabilities can be reported privately via the <a href="https://github.com/FournineCS/turul-app/security/advisories/new">GitHub Security Advisory</a> or per the <a href="https://github.com/FournineCS/turul-app/blob/main/.github/SECURITY.md">Security policy</a>.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap row">
+    <div>© Fournine Cloud · Apache-2.0 · <a href="https://github.com/FournineCS/turul-app">github.com/FournineCS/turul-app</a></div>
+    <div>
+      <a href="https://github.com/FournineCS/turul-app/blob/main/CHANGELOG.md">Changelog</a> ·
+      <a href="https://github.com/FournineCS/turul-app/blob/main/CONTRIBUTING.md">Contributing</a> ·
+      <a href="https://github.com/FournineCS/turul-app/blob/main/.github/SECURITY.md">Security</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
