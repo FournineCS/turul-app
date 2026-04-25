@@ -35,7 +35,10 @@ jobs:
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
-          queries: security-extended,security-and-quality
+          # Security-only. The `security-and-quality` pack produces ~40
+          # `js/unused-local-variable` style alerts that overwhelm the
+          # security UI; ESLint already enforces those locally.
+          queries: security-extended
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@95e58e9a2cdfd71adc6e0353d5c52f41a045d225 # v4
