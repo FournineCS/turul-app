@@ -138,7 +138,9 @@ export const useGCPProjectStore = create<GCPProjectState>((set, get) => ({
   setSelectedProjectId: (projectId: string) => {
     set({ selectedProjectId: projectId });
     getActiveAccountId().then((accountId) => {
-      window.electronAPI?.settings?.set(projectKey(accountId), projectId).catch(() => {});
+      window.electronAPI?.settings?.set(projectKey(accountId), projectId).catch((error) => {
+        console.error('Failed to persist selected project ID:', error);
+      });
     });
   },
 
@@ -180,7 +182,9 @@ export const useGCPProjectStore = create<GCPProjectState>((set, get) => ({
     set({ selectedOrgId: orgId });
     if (orgId) {
       getActiveAccountId().then((accountId) => {
-        window.electronAPI?.settings?.set(orgKey(accountId), orgId).catch(() => {});
+        window.electronAPI?.settings?.set(orgKey(accountId), orgId).catch((error) => {
+          console.error(`Failed to persist selected organization for account ${accountId}:`, error);
+        });
       });
     }
     // Reload billing config with new org scope
