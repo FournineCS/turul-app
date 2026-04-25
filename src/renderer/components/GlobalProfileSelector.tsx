@@ -21,11 +21,13 @@ const GlobalProfileSelector: React.FC<GlobalProfileSelectorProps> = ({ onManageG
     selectedOrgId,
     isLoading,
     error,
+    needsReauth,
     loadProjects,
     loadOrganizations,
     setSelectedProjectId,
     setSelectedOrgId,
     setAuthenticated,
+    clearForAccountSwitch,
   } = useGCPProjectStore();
   const {
     accounts,
@@ -34,7 +36,17 @@ const GlobalProfileSelector: React.FC<GlobalProfileSelectorProps> = ({ onManageG
     loadAccounts,
     addAccount,
     activateAccount,
+    reloginAccount,
   } = useGCPAccountStore();
+
+  const handleReauth = async () => {
+    if (!selectedAccountId) return;
+    await reloginAccount(selectedAccountId);
+    // After successful re-login, retry projects + orgs
+    setAuthenticated(true);
+    loadProjects();
+    loadOrganizations();
+  };
 
   // When switching to GCP, load accounts + projects
   useEffect(() => {
@@ -51,11 +63,16 @@ const GlobalProfileSelector: React.FC<GlobalProfileSelectorProps> = ({ onManageG
   }, [selectedProvider]);
 
   const handleAccountChange = async (accountId: string) => {
+    if (!accountId) return;
+    // Immediately clear previous account's projects/org/selection so the UI
+    // doesn't show stale data while the new account loads.
+    clearForAccountSwitch();
     await activateAccount(accountId);
     setAuthenticated(true);
-    // Reload projects for the new account
-    loadProjects();
-    loadOrganizations();
+    // Load projects for the new account, then orgs (orgs may trigger a project
+    // re-load if the list is empty, so order matters less but this is cleaner).
+    await loadProjects();
+    await loadOrganizations();
   };
 
   const handleAddAccount = async () => {
@@ -171,29 +188,54 @@ const GlobalProfileSelector: React.FC<GlobalProfileSelectorProps> = ({ onManageG
                   </>
                 )}
               </select>
-              {/* Retry button + error when projects failed to load */}
+              {/* Re-auth or Retry button + error when projects failed to load */}
               {!isLoading && projects.length === 0 && selectedAccountId && (
                 <>
-                  <button
-                    onClick={() => loadProjects()}
-                    title={error || 'Retry loading projects'}
-                    style={{
-                      padding: '3px 10px',
-                      fontSize: '11px',
-                      borderRadius: '4px',
-                      border: '1px solid #f59e0b',
-                      background: 'transparent',
-                      color: '#f59e0b',
-                      cursor: 'pointer',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    Retry
-                  </button>
-                  {error && (
-                    <span style={{ fontSize: '11px', color: '#ef4444', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={error}>
-                      {error}
-                    </span>
+                  {needsReauth ? (
+                    <button
+                      onClick={handleReauth}
+                      disabled={accountLoading}
+                      title="Your Google session has expired. Click to re-authenticate."
+                      style={{
+                        padding: '3px 10px',
+                        fontSize: '11px',
+                        borderRadius: '4px',
+                        border: '1px solid #4285f4',
+                        background: '#4285f4',
+                        color: '#fff',
+                        cursor: accountLoading ? 'not-allowed' : 'pointer',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {accountLoading ? 'Re-authenticating...' : 'Re-authenticate'}
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => loadProjects()}
+                        title={error || 'Retry loading projects'}
+                        style={{
+                          padding: '3px 10px',
+                          fontSize: '11px',
+                          borderRadius: '4px',
+                          border: '1px solid #f59e0b',
+                          background: 'transparent',
+                          color: '#f59e0b',
+                          cursor: 'pointer',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        Retry
+                      </button>
+                      {error && (
+                        <span
+                          style={{ fontSize: '11px', color: '#ef4444', maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                          title={error}
+                        >
+                          {error}
+                        </span>
+                      )}
+                    </>
                   )}
                 </>
               )}
