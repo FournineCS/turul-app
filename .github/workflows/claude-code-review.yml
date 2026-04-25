@@ -15,12 +15,10 @@ permissions:
 
 jobs:
   claude-review:
-    # Optional: Filter by PR author
-    # if: |
-    #   github.event.pull_request.user.login == 'external-contributor' ||
-    #   github.event.pull_request.user.login == 'new-developer' ||
-    #   github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR'
-
+    # Skip bot-authored PRs (Dependabot, Renovate, GitHub Actions bot, etc.).
+    # The action refuses non-human actors by default for safety, and there's
+    # no review value in burning Claude tokens on lockfile / SHA bumps.
+    if: github.event.pull_request.user.type == 'User'
     runs-on: ubuntu-latest
     permissions:
       contents: read
