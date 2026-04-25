@@ -13,7 +13,10 @@ permissions:
 
 jobs:
   analyze:
-    name: Analyze (${{ matrix.language }})
+    # Static name (no matrix template) so branch protection can require it
+    # by exact match — when the job is skipped (e.g. on Dependabot PRs) the
+    # matrix isn't expanded and a templated name would not match.
+    name: CodeQL
     # Dependabot PRs run with a downgraded read-only GITHUB_TOKEN, so the
     # SARIF upload fails with "Resource not accessible by integration".
     # The post-merge push to main re-runs CodeQL with a normal token, so
