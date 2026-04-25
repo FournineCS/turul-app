@@ -32,7 +32,7 @@ export const AssessmentConfigForm: React.FC<AssessmentConfigFormProps> = ({ onSu
   const selectedProfileName = useProfileStore((s) => s.selectedProfileName);
   const [selectedRegion, setSelectedRegion] = useState('us-west-2');
   const [selectedDomains, setSelectedDomains] = useState<AssessmentDomain[]>([
-    'cost', 'security', 'wellArchitected',
+    'cost', 'security', 'wellArchitected', 'inventory',
   ]);
   const [costDays, setCostDays] = useState(30);
   const [includeResourceScan, setIncludeResourceScan] = useState(false);

@@ -1,0 +1,186 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/* Copyright 2024-present Fournine Cloud */
+
+.quick-assess-card {
+  position: relative;
+  margin-bottom: 28px;
+  padding: 0;
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 0% 0%, var(--color-primary-glow), transparent 55%),
+    linear-gradient(180deg, var(--color-bg-secondary) 0%, var(--color-bg-tertiary) 100%);
+  border: 1px solid var(--color-border);
+  overflow: hidden;
+  box-shadow: 0 20px 60px -30px var(--color-primary-glow);
+}
+
+.quick-assess-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(
+      to right,
+      transparent 0,
+      var(--color-border-subtle) 50%,
+      transparent 100%
+    );
+  background-size: 100% 1px;
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  pointer-events: none;
+}
+
+.quick-assess-card__inner {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 36px;
+  padding: 36px 40px;
+  align-items: center;
+}
+
+.quick-assess-card__lead {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.quick-assess-card__eyebrow {
+  display: inline-block;
+  width: fit-content;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+  background: var(--color-primary-glow);
+  border: 1px solid var(--color-primary-soft);
+}
+
+.quick-assess-card__title {
+  margin: 0;
+  font-size: clamp(22px, 1.2vw + 18px, 30px);
+  line-height: 1.18;
+  letter-spacing: -0.02em;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.quick-assess-card__subtitle {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: var(--color-text-secondary);
+  max-width: 52ch;
+}
+
+.quick-assess-card__actions {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.quick-assess-card__cta {
+  font-weight: 600;
+  letter-spacing: 0.005em;
+}
+
+.quick-assess-card__secondary {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  border-bottom: 1px dashed transparent;
+  transition: color 150ms ease, border-color 150ms ease;
+}
+
+.quick-assess-card__secondary:hover {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+}
+
+.quick-assess-card__hint {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  color: var(--color-text-muted);
+}
+
+.quick-assess-card__pillars {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.quick-assess-card__pillar {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border-subtle);
+  transition: transform 200ms ease, border-color 200ms ease;
+  min-width: 0;
+}
+
+.quick-assess-card__pillar:hover {
+  transform: translateY(-1px);
+  border-color: var(--color-primary-soft);
+}
+
+.quick-assess-card__pillar-glyph {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--color-primary-glow);
+  color: var(--color-primary);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.quick-assess-card__pillar-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--color-text);
+  letter-spacing: -0.005em;
+}
+
+.quick-assess-card__pillar-desc {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+  margin-top: 2px;
+}
+
+.quick-assess-compact {
+  white-space: nowrap;
+}
+
+@media (max-width: 960px) {
+  .quick-assess-card__inner {
+    grid-template-columns: 1fr;
+    padding: 28px 24px;
+    gap: 24px;
+  }
+  .quick-assess-card__pillars {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .quick-assess-card__pillars {
+    grid-template-columns: 1fr;
+  }
+}

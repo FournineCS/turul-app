@@ -14,6 +14,8 @@ import SecurityPostureGauge from '../components/dashboard/SecurityPostureGauge';
 import AssessmentGradeCard from '../components/dashboard/AssessmentGradeCard';
 import ResourceTrendChart from '../components/dashboard/ResourceTrendChart';
 import TopServicesPieChart from '../components/dashboard/TopServicesPieChart';
+import QuickAssessCard from '../components/dashboard/QuickAssessCard';
+import FullAssessmentProgress from '../components/dashboard/FullAssessmentProgress';
 
 const DashboardPage: React.FC = () => {
   const { scans, isLoading, loadScans, scanProgress, isScanning } = useScanStore();
@@ -94,11 +96,20 @@ const DashboardPage: React.FC = () => {
   const latestScan = profileScans[0];
   const completedScans = profileScans.filter((s) => s.status === 'completed');
   const totalResources = completedScans.reduce((sum, s) => sum + s.resourceCount, 0);
+  const hasAnyData =
+    profileScans.length > 0 ||
+    profileAssessments.length > 0 ||
+    (selectedProvider === 'gcp' && gcpHistory.length > 0);
+  const showQuickAssessHero = !!activeIdentity && !hasAnyData;
 
   return (
     <>
-      <header className="page-header">
-        <h1 className="page-title">
+      <FullAssessmentProgress />
+      <header
+        className="page-header"
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}
+      >
+        <h1 className="page-title" style={{ margin: 0 }}>
           Dashboard
           <span
             style={{
@@ -115,9 +126,11 @@ const DashboardPage: React.FC = () => {
             {selectedProvider === 'gcp' ? 'Google Cloud' : 'AWS'}
           </span>
         </h1>
+        {!showQuickAssessHero && activeIdentity && <QuickAssessCard variant="compact" />}
       </header>
 
       <div className="page-content">
+        {showQuickAssessHero && <QuickAssessCard />}
         {/* Active Scan Progress */}
         {isScanning && scanProgress && (
           <div className="card mb-4">
@@ -224,11 +237,11 @@ const DashboardPage: React.FC = () => {
             </div>
           ) : profileScans.length === 0 ? (
             <div className="empty-state">
-              <h3>No scans for this profile</h3>
-              <p>Start a scan to discover resources for {activeIdentity}</p>
-              <Link to="/scan" className="btn btn-primary mt-4">
-                Start Scan
-              </Link>
+              <h3>No scans for this profile yet</h3>
+              <p>
+                Click <strong>Assess my account fully</strong> above to populate this section
+                — or start a custom scan from the <Link to="/scan">Scan page</Link>.
+              </p>
             </div>
           ) : (
             <div className="table-container">
