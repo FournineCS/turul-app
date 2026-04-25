@@ -2,15 +2,15 @@
 # https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
 
 # Default: maintainer reviews everything
-*                               @sampathinturi
+*                               @samfnc @sampathinturi
 
 # Workflows / CI / release pipeline
-/.github/                       @sampathinturi
-/.github/workflows/             @sampathinturi
-/RELEASING.md                   @sampathinturi
+/.github/                       @samfnc @sampathinturi
+/.github/workflows/             @samfnc @sampathinturi
+/RELEASING.md                   @samfnc @sampathinturi
 
 # Security-sensitive surfaces
-/.github/SECURITY.md            @sampathinturi
-/src/main/auth/                 @sampathinturi
-/src/main/ipc/                  @sampathinturi
-/src/main/database/             @sampathinturi
+/.github/SECURITY.md            @samfnc @sampathinturi
+/src/main/auth/                 @samfnc @sampathinturi
+/src/main/ipc/                  @samfnc @sampathinturi
+/src/main/database/             @samfnc @sampathinturi
