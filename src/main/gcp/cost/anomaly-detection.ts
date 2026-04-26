@@ -106,9 +106,8 @@ export async function detectCostAnomalies(
 
   const tableRef = `\`${bqProject}.${bqDataset}.${billingTable}\``;
 
-  // Net cost: sum(cost) + sum(credits.amount). Credits.amount is negative.
-  const netCostExpr = `SUM(cost) + SUM(IFNULL((SELECT SUM(c.amount) FROM UNNEST(credits) c), 0))`;
-
+  // Net cost: cost + sum(credits.amount). Credits.amount is negative, so this
+  // surfaces spikes from credit expiry. Inlined into both queries below.
   // Service-level WoW comparison
   const serviceQuery = `
     WITH windows AS (
