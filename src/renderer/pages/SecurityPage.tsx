@@ -6,6 +6,7 @@ import { useSecurityStore, getFilteredFindings } from '../stores/securityStore';
 import { useProfileStore } from '../stores/profileStore';
 import { useProviderStore } from '../stores/providerStore';
 import { useGCPProjectStore } from '../stores/gcpProjectStore';
+import { useSettingsStore } from '../stores/settingsStore';
 import { SecurityOverview } from '../components/security/SecurityOverview';
 import { FindingsSeverityChart } from '../components/security/FindingsSeverityChart';
 import { FindingsBySourceChart } from '../components/security/FindingsBySourceChart';
@@ -83,6 +84,9 @@ const SecurityPage: React.FC = () => {
   const selectedProfile = useProfileStore((s) => s.selectedProfileName);
   const selectedProvider = useProviderStore((s) => s.selectedProvider);
   const selectedProjectId = useGCPProjectStore((s) => s.selectedProjectId);
+  const sccDefaultProject = useSettingsStore((s) => s.settings.gcpSccProjectId);
+  const sccDefaultOrgId = useSettingsStore((s) => s.settings.gcpSccOrgId);
+  const loadGCPSecurityPosture = useSecurityStore((s) => s.loadGCPSecurityPosture);
 
   const activeIdentity = selectedProvider === 'gcp' ? selectedProjectId : selectedProfile;
   const noIdentity = !activeIdentity;
@@ -178,10 +182,18 @@ const SecurityPage: React.FC = () => {
     if (!activeIdentity) return;
     if (scanMode === 'best_practices') {
       runProviderBestPractices(selectedProvider, activeIdentity, selectedRegion);
-    } else {
-      loadPosture(selectedProvider, activeIdentity, selectedRegion);
+      return;
     }
-  }, [activeIdentity, selectedProvider, selectedRegion, scanMode, loadPosture, runProviderBestPractices]);
+    if (selectedProvider === 'gcp') {
+      // SCC honors two Settings overrides:
+      //   - "Default SCC Project" → quota project + project-scope fallback
+      //   - "Default SCC Organization ID" → org-scope listFindings parent
+      const sccTarget = sccDefaultProject || activeIdentity;
+      loadGCPSecurityPosture(sccTarget, { orgId: sccDefaultOrgId || undefined });
+      return;
+    }
+    loadPosture(selectedProvider, activeIdentity, selectedRegion);
+  }, [activeIdentity, selectedProvider, selectedRegion, scanMode, sccDefaultProject, sccDefaultOrgId, loadPosture, loadGCPSecurityPosture, runProviderBestPractices]);
 
   const handleScanModeChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {

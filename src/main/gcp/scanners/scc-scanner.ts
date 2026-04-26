@@ -13,14 +13,19 @@ export class SecurityCommandCenterScanner extends GCPBaseScanner {
     const resources: GCPScanResult['resources'] = [];
     const errors: GCPScanResult['errors'] = [];
     const factory = getGCPClientFactory(this.config.projectId);
-    const client = factory.getSecurityCenterClient();
+    const client = await factory.getSecurityCenterClient();
+    const { resolveSccParent } = await import('../security/scc-client');
 
     try {
-      // Try project-level findings first (more commonly accessible than org-level)
-      const parent = `projects/${this.config.projectId}/sources/-`;
+      // Resolve the right parent (org if discoverable, else project) and apply
+      // a project-scoped resource filter when querying org-wide.
+      const parentInfo = await resolveSccParent(this.config.projectId);
+      const filter = parentInfo.resourceFilter
+        ? `state="ACTIVE" AND ${parentInfo.resourceFilter}`
+        : 'state="ACTIVE"';
       const iterable = client.listFindingsAsync({
-        parent,
-        filter: 'state="ACTIVE"',
+        parent: parentInfo.parent,
+        filter,
       });
 
       let count = 0;

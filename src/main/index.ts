@@ -56,7 +56,7 @@ import { getEnvironmentChecker } from './health/environment-checker';
 import { setGcloudResolverDB } from './gcp/gcloud-resolver';
 import { GCPCredentialManager } from './gcp/credential-manager';
 import { getGCPAuthManager } from './gcp/auth-manager';
-import { setGCPCredentialManagerRef, cleanupAllTempCredFiles } from './gcp/auth-factory';
+import { setGCPDbManagerRef, cleanupAllTempCredFiles } from './gcp/auth-factory';
 
 // Suppress EPIPE on stdout/stderr — in packaged macOS apps launched from
 // Finder/Dock, these pipes connect to ASL and can break. Without this,
@@ -81,6 +81,7 @@ async function initServices() {
     dbManager = new DatabaseManager();
     await dbManager.initialize();
     setGcloudResolverDB(dbManager);
+    setGCPDbManagerRef(dbManager);
   }
   if (!ipcRegistered) {
     registerIpcHandlers(dbManager);

@@ -13,6 +13,8 @@ import { CostTrendChart } from '../components/costs/CostTrendChart';
 import { ServiceCostBreakdown } from '../components/costs/ServiceCostBreakdown';
 import { CostOptimizations } from '../components/costs/CostOptimizations';
 import { ProjectCostBreakdown } from '../components/costs/ProjectCostBreakdown';
+import GCPBudgetsPanel from '../components/costs/GCPBudgetsPanel';
+import GCPAnomaliesPanel from '../components/costs/GCPAnomaliesPanel';
 import ExportCSVButton from '../components/ExportCSVButton';
 import GCPCostFiltersBar from '../components/costs/GCPCostFilters';
 import CostPieChart from '../components/costs/CostPieChart';
@@ -598,6 +600,31 @@ const CostsPage: React.FC = () => {
                     isLoading={isLoading}
                     showProject={isOrgScope}
                   />
+                )}
+
+                {/* Cost Anomalies — GCP project scope, requires BQ billing export */}
+                {selectedProvider === 'gcp' && !isOrgScope && billingConfig?.bqProject && billingConfig?.bqDataset && (
+                  <section style={{ marginTop: 24 }}>
+                    <h3 style={{ margin: '0 0 12px', fontSize: 15, color: 'var(--color-text)' }}>
+                      Cost Anomalies
+                    </h3>
+                    <GCPAnomaliesPanel
+                      projectId={selectedProjectId}
+                      bqProject={billingConfig.bqProject}
+                      bqDataset={billingConfig.bqDataset}
+                      bqRegion={billingConfig.bqRegion || null}
+                    />
+                  </section>
+                )}
+
+                {/* Cloud Billing Budgets — GCP project scope only */}
+                {selectedProvider === 'gcp' && !isOrgScope && (
+                  <section style={{ marginTop: 24 }}>
+                    <h3 style={{ margin: '0 0 12px', fontSize: 15, color: 'var(--color-text)' }}>
+                      Cloud Billing Budgets
+                    </h3>
+                    <GCPBudgetsPanel projectId={selectedProjectId} />
+                  </section>
                 )}
 
               </>

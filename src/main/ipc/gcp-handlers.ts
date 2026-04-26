@@ -16,11 +16,17 @@ import type {
   GCPCUDCoverageResult,
   GCPCostFilters,
   StoppedVMResult,
+  GCPBudget,
+  GCPBudgetListResult,
+  GCPCostAnomalyOptions,
+  GCPCostAnomalyResult,
+  GCPCostInsightResult,
   ResourceIdleAnalysisResult,
   GCPOptimizationSnapshot,
   GCPCostCacheEntry,
   GKECostAnalysis,
   CreditsAnalysisResult,
+  SccProbeResult,
 } from '../../shared/types';
 import { DatabaseManager } from '../database/db-manager';
 import { getGCPAuthManager } from '../gcp/auth-manager';
@@ -35,6 +41,9 @@ import { getExpandedCostRecommendations, getExpandedCostRecommendationsOrgWide }
 import { runGCPCostBestPractices } from '../gcp/cost/cost-best-practices';
 import { getGCPCUDCoverage } from '../gcp/cost/cud-coverage';
 import { getStoppedVMs, getStoppedVMsOrgWide } from '../gcp/cost/stopped-vm-analysis';
+import { resolveBillingAccountForProject, listBudgets, getBudget } from '../gcp/cost/budgets';
+import { detectCostAnomalies } from '../gcp/cost/anomaly-detection';
+import { getGCPCostInsights } from '../gcp/cost/insights';
 import { getGCPCreditsAnalysis, getGCPOrgCreditsAnalysis } from '../gcp/cost/credits-analysis';
 import { analyzeIdleResources } from '../gcp/cost/resource-idle-analysis';
 import {
@@ -50,7 +59,7 @@ import {
   getLatestCostCacheEntry,
   deleteCostCacheEntry,
 } from '../gcp/cost/cost-cache';
-import { getGCPSecurityPosture } from '../gcp/security/scc-integration';
+import { getGCPSecurityPosture, probeSccConnection } from '../gcp/security/scc-integration';
 import { runGCPBestPracticesScan } from '../gcp/security/best-practices';
 import { generateCostExcel } from '../reports/cost-export';
 import { generateCostPdf } from '../reports/cost-pdf-generator';
@@ -448,6 +457,82 @@ export function registerGCPHandlers(dbManager: DatabaseManager, gcpCredentialMan
     }
   });
 
+  // Resolve billing-account name for a project
+  ipcMain.handle('gcp:cost:resolve-billing-account', async (
+    _event,
+    projectId: string
+  ): Promise<IpcResponse<{ billingAccountName: string | null }>> => {
+    try {
+      requireAuth();
+      const billingAccountName = await resolveBillingAccountForProject(projectId);
+      return { success: true, data: { billingAccountName } };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+
+  // List Cloud Billing budgets for a billing account
+  ipcMain.handle('gcp:cost:list-budgets', async (
+    _event,
+    projectId: string,
+    billingAccountName: string
+  ): Promise<IpcResponse<GCPBudgetListResult>> => {
+    try {
+      requireAuth();
+      const result = await listBudgets(projectId, billingAccountName);
+      return { success: true, data: result };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+
+  // Get a single budget by full resource name
+  ipcMain.handle('gcp:cost:get-budget', async (
+    _event,
+    projectId: string,
+    budgetName: string
+  ): Promise<IpcResponse<GCPBudget | null>> => {
+    try {
+      requireAuth();
+      const result = await getBudget(projectId, budgetName);
+      return { success: true, data: result };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+
+  // BQ-heuristic cost anomaly detection
+  ipcMain.handle('gcp:cost:detect-anomalies', async (
+    _event,
+    projectId: string,
+    bqProject: string,
+    bqDataset: string,
+    bqRegion?: string,
+    options?: GCPCostAnomalyOptions
+  ): Promise<IpcResponse<GCPCostAnomalyResult>> => {
+    try {
+      requireAuth();
+      const result = await detectCostAnomalies(projectId, bqProject, bqDataset, bqRegion, options);
+      return { success: true, data: result };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+
+  // Recommender API — diagnostic insights (paired with cost recommendations)
+  ipcMain.handle('gcp:cost:get-insights', async (
+    _event,
+    projectId: string
+  ): Promise<IpcResponse<GCPCostInsightResult>> => {
+    try {
+      requireAuth();
+      const result = await getGCPCostInsights(projectId);
+      return { success: true, data: result };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+
   // Stopped / suspended VM analysis
   ipcMain.handle('gcp:cost:get-stopped-vms', async (
     _event,
@@ -594,7 +679,8 @@ export function registerGCPHandlers(dbManager: DatabaseManager, gcpCredentialMan
   // Security handlers — fire and forget
   ipcMain.handle('gcp:security:get-posture', async (
     _event,
-    projectId: string
+    projectId: string,
+    options?: { orgId?: string },
   ): Promise<IpcResponse<{ started: boolean }>> => {
     try {
       requireAuth();
@@ -602,7 +688,7 @@ export function registerGCPHandlers(dbManager: DatabaseManager, gcpCredentialMan
         return { success: false, error: 'Invalid projectId' };
       }
       const mainWindow = BrowserWindow.getAllWindows()[0];
-      getGCPSecurityPosture(projectId).then((result) => {
+      getGCPSecurityPosture(projectId, { orgId: options?.orgId }).then((result) => {
         try { dbManager.createGCPSecurityScan(result); } catch (e) { console.error('Failed to save GCP security scan:', e); }
         mainWindow?.webContents.send('gcp:security:completed', result);
       }).catch((error) => {
@@ -611,6 +697,27 @@ export function registerGCPHandlers(dbManager: DatabaseManager, gcpCredentialMan
         });
       });
       return { success: true, data: { started: true } };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+
+  // Diagnostic probe — runs listFindings(pageSize=1) once and returns the raw
+  // result (or error) synchronously. No DB writes. Use from Settings →
+  // "Test SCC Connection" to see exactly which parent/scope was queried and
+  // the actual gRPC error code.
+  ipcMain.handle('gcp:security:test-connection', async (
+    _event,
+    projectId: string,
+    options?: { orgId?: string },
+  ): Promise<IpcResponse<SccProbeResult>> => {
+    try {
+      requireAuth();
+      if (!projectId || typeof projectId !== 'string') {
+        return { success: false, error: 'Invalid projectId' };
+      }
+      const result = await probeSccConnection(projectId, options?.orgId);
+      return { success: true, data: result };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : String(error) };
     }

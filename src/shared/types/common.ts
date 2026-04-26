@@ -853,6 +853,30 @@ export interface SecurityAnalysisResult {
   error?: string;
 }
 
+/**
+ * Diagnostic payload returned by Settings → "Test SCC Connection".
+ * Returns the raw outcome of a single `listFindings(pageSize=1)` call so the
+ * UI can show exactly which parent/scope was queried and the actual gRPC
+ * status code on failure (rather than a re-mapped human message).
+ */
+export interface SccProbeResult {
+  ok: boolean;
+  parent: string;
+  scope: 'organization' | 'project';
+  orgId?: string;
+  orgIdSource: 'settings' | 'discovered' | 'none';
+  quotaProject: string;
+  filter: string;
+  durationMs: number;
+  sampleCount?: number;
+  error?: {
+    grpcCode: number | null;
+    grpcCodeName: string;
+    message: string;
+    details?: string;
+  };
+}
+
 export interface SecurityFilters {
   severities: FindingSeverity[];
   sources: FindingSource[];
@@ -905,7 +929,12 @@ export type IdleResourceIssueType =
   | 'unattached_disk'
   | 'unused_lb'
   | 'empty_dns_zone'
-  | 'stopped_vm';
+  | 'stopped_vm'
+  | 'idle_vertex_endpoint'
+  | 'errored_composer_env'
+  | 'orphaned_forwarding_rule'
+  | 'orphaned_pubsub_topic'
+  | 'orphaned_pubsub_subscription';
 
 export interface ResourceIdleFinding {
   id: string;

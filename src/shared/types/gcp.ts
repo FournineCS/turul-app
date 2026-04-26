@@ -181,6 +181,143 @@ export interface GCPCommitment {
   resources: Array<{ type: string; amount: number; unit: string }>;
 }
 
+// ── GCP Cloud Billing Budgets (billingbudgets.googleapis.com/v1) ──
+
+export type GCPBudgetThresholdBasis = 'CURRENT_SPEND' | 'FORECASTED_SPEND' | 'UNSPECIFIED';
+
+export interface GCPBudgetThreshold {
+  thresholdPercent: number;       // e.g. 0.5 = 50%
+  spendBasis: GCPBudgetThresholdBasis;
+}
+
+export interface GCPBudgetAmount {
+  currencyCode: string;
+  // Specified amount (nullable when budget tracks last-period cost)
+  units?: number;
+  // Last-period budget mode: percentage of previous period(s)
+  lastPeriodAmount?: boolean;
+  // For LAST_PERIODS_COST budgets, how many prior periods are summed (1-13)
+  lastPeriodsCount?: number;
+}
+
+export interface GCPBudgetFilter {
+  projects?: string[];           // e.g. ["projects/123"]
+  services?: string[];           // e.g. ["services/A1B2-C3D4-E5F6"]
+  creditTypesTreatment?: string; // INCLUDE_ALL_CREDITS, EXCLUDE_ALL_CREDITS, etc.
+  labels?: Record<string, string[]>;
+  calendarPeriod?: string;       // MONTH, QUARTER, YEAR
+  customPeriodStart?: string;
+  customPeriodEnd?: string;
+}
+
+export interface GCPBudget {
+  name: string;                  // billingAccounts/{id}/budgets/{uuid}
+  displayName: string;
+  amount: GCPBudgetAmount;
+  thresholds: GCPBudgetThreshold[];
+  filter?: GCPBudgetFilter;
+  pubsubTopic?: string;
+  notificationEmail?: boolean;   // true if monitoringNotificationChannels or default email used
+  etag?: string;
+}
+
+export interface GCPBudgetListResult {
+  billingAccountId: string;      // billingAccounts/{id}
+  budgets: GCPBudget[];
+  errors: string[];
+}
+
+// ── GCP Cost Anomaly Detection (BigQuery-heuristic) ──
+
+export type GCPCostAnomalySeverity = 'low' | 'medium' | 'high';
+export type GCPCostAnomalyDirection = 'increase' | 'decrease';
+
+export interface GCPCostAnomalySkuContributor {
+  sku: string;                  // SKU description
+  cost: number;                 // cost in the comparison window
+  priorCost: number;            // cost in the baseline window
+  delta: number;                // cost - priorCost
+}
+
+export interface GCPCostAnomaly {
+  id: string;                   // stable hash of service+window
+  service: string;              // billing service.description
+  windowDays: number;           // length of comparison window (default 7)
+  windowStart: string;          // ISO date (inclusive)
+  windowEnd: string;            // ISO date (inclusive)
+  baselineStart: string;        // ISO date (inclusive)
+  baselineEnd: string;          // ISO date (inclusive)
+  cost: number;                 // total net cost in window
+  priorCost: number;            // total net cost in baseline window
+  delta: number;                // cost - priorCost (signed)
+  deviationPct: number;         // (cost - priorCost) / priorCost * 100
+  direction: GCPCostAnomalyDirection;
+  severity: GCPCostAnomalySeverity;
+  topSkus: GCPCostAnomalySkuContributor[];  // up to 3 contributors by absolute delta
+  description: string;
+  currency: string;
+}
+
+export interface GCPCostAnomalyOptions {
+  windowDays?: number;          // default 7
+  minDeviationPct?: number;     // default 30
+  minImpactUsd?: number;        // default 25
+  maxAnomalies?: number;        // default 25
+}
+
+export interface GCPCostAnomalyResult {
+  anomalies: GCPCostAnomaly[];
+  windowStart: string;
+  windowEnd: string;
+  baselineStart: string;
+  baselineEnd: string;
+  servicesEvaluated: number;
+  thresholds: {
+    minDeviationPct: number;
+    minImpactUsd: number;
+    windowDays: number;
+  };
+  errors: string[];
+}
+
+// ── GCP Recommender API — Insights (diagnostic data, sometimes paired with recommendations) ──
+
+export type GCPCostInsightSeverity = 'critical' | 'high' | 'medium' | 'low';
+export type GCPCostInsightCategory =
+  | 'cost'
+  | 'performance'
+  | 'reliability'
+  | 'security'
+  | 'manageability'
+  | 'sustainability';
+
+export interface GCPCostInsight {
+  id: string;                              // full insight resource name (or fallback)
+  insightType: string;                     // e.g. google.cloudsql.instance.CpuUsageInsight
+  insightSubtype?: string;
+  service: string;                         // human-readable service grouping
+  description: string;
+  severity: GCPCostInsightSeverity;
+  category: GCPCostInsightCategory;
+  targetResources: string[];               // GCP resource URIs
+  primaryResourceName: string;             // last segment of first target
+  location: string;                        // region/zone/global
+  state?: string;                          // ACTIVE, ACCEPTED, DISMISSED, etc.
+  lastRefreshTime?: string;
+  observationPeriodSeconds?: number;
+  associatedRecommendations: string[];     // recommendation resource names
+  content?: Record<string, unknown>;       // raw content payload
+}
+
+export interface GCPCostInsightResult {
+  insights: GCPCostInsight[];
+  insightTypesScanned: string[];
+  locationsScanned: string[];
+  byType: Record<string, number>;
+  bySeverity: Record<GCPCostInsightSeverity, number>;
+  errors: string[];
+}
+
 // GCP Service Categories (for UI grouping)
 export const GCP_SERVICE_CATEGORIES: Record<string, { label: string; services: GCPServiceType[] }> = {
   compute: {

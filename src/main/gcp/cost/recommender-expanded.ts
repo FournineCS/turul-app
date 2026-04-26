@@ -4,6 +4,7 @@
 import { google } from 'googleapis';
 import { GoogleAuth } from 'google-auth-library';
 import { getGCPProjectManager } from '../project-manager';
+import { resolveBillingAccountForProject } from './budgets';
 import type {
   CostOptimizationRecommendation,
   GCPExpandedRecommendationsResult,
@@ -12,6 +13,11 @@ import type {
   GCPRecommendation,
 } from './types';
 import type { GCPOrgScanProgress } from '../../../shared/types';
+
+// Billing-account-scoped recommender (parent path differs from project recommenders)
+const BILLING_ACCOUNT_RECOMMENDERS = [
+  'google.cloudbilling.commitment.SpendBasedCommitmentRecommender',
+];
 
 // All cost-category recommender types from GCP Recommender API
 export const COST_RECOMMENDER_TYPES = [
@@ -33,10 +39,13 @@ export const COST_RECOMMENDER_TYPES = [
   'google.bigquery.table.PartitionClusterRecommender',
   // Cloud Run (1)
   'google.run.service.CostRecommender',
-  // Cloud Storage (1)
+  // Cloud Storage (2)
   'google.storage.bucket.SoftDeleteRecommender',
-  // GKE (1) — CLUSTER_IDLE subtype only; other subtypes are filtered below
+  'google.storage.bucket.AnywhereCacheRecommender',
+  // GKE (1) — cost-relevant subtypes (CLUSTER_IDLE, CLUSTER_OVERPROVISIONED, WORKLOAD_OVERPROVISIONED) kept; *_UNDERPROVISIONED reliability subtypes are filtered below
   'google.container.DiagnosisRecommender',
+  // Resource Manager (1) — unattended project recommender
+  'google.resourcemanager.projectUtilization.Recommender',
 ];
 
 // Comprehensive fallback region list (all GCP regions as of early 2026)
@@ -69,15 +78,16 @@ const ZONE_RECOMMENDERS = new Set([
   'google.compute.disk.IdleResourceRecommender',
 ]);
 
-// Region-scoped recommenders (addresses, Cloud SQL, Cloud Run)
+// Region-scoped recommenders (addresses, Cloud SQL, Cloud Run, Anywhere Cache by bucket location)
 const REGION_RECOMMENDERS = new Set([
   'google.compute.address.IdleResourceRecommender',
   'google.cloudsql.instance.IdleRecommender',
   'google.cloudsql.instance.OverprovisionedRecommender',
   'google.run.service.CostRecommender',
+  'google.storage.bucket.AnywhereCacheRecommender',
 ]);
 
-// Global-scoped recommenders (images, commitments, BigQuery, GKE, Storage)
+// Global-scoped recommenders (images, commitments, BigQuery, GKE, Storage, project utilization)
 const GLOBAL_RECOMMENDERS = new Set([
   'google.compute.image.IdleResourceRecommender',
   'google.compute.IdleResourceRecommender',
@@ -87,6 +97,7 @@ const GLOBAL_RECOMMENDERS = new Set([
   'google.bigquery.table.PartitionClusterRecommender',
   'google.storage.bucket.SoftDeleteRecommender',
   'google.container.DiagnosisRecommender',
+  'google.resourcemanager.projectUtilization.Recommender',
 ]);
 
 /**
@@ -183,9 +194,15 @@ export async function getExpandedCostRecommendations(
       const parent = `projects/${projectId}/locations/${task.location}/recommenders/${task.recommenderType}`;
       let [recs] = await client.listRecommendations({ parent });
 
-      // DiagnosisRecommender covers many subtypes; only CLUSTER_IDLE is a cost recommendation
+      // DiagnosisRecommender returns both cost and reliability subtypes — keep only cost-relevant
+      // CATEGORY_COST: CLUSTER_IDLE, CLUSTER_OVERPROVISIONED, WORKLOAD_OVERPROVISIONED
+      // CATEGORY_RELIABILITY (filtered out): CLUSTER_UNDERPROVISIONED, WORKLOAD_UNDERPROVISIONED
       if (task.recommenderType === 'google.container.DiagnosisRecommender') {
-        recs = (recs as GCPRecommendation[]).filter((r) => r.recommenderSubtype === 'CLUSTER_IDLE');
+        recs = (recs as GCPRecommendation[]).filter((r) =>
+          r.recommenderSubtype === 'CLUSTER_IDLE' ||
+          r.recommenderSubtype === 'CLUSTER_OVERPROVISIONED' ||
+          r.recommenderSubtype === 'WORKLOAD_OVERPROVISIONED'
+        );
       }
 
       for (const rec of recs as GCPRecommendation[]) {
@@ -194,7 +211,7 @@ export async function getExpandedCostRecommendations(
         const recType = mapRecommenderType(task.recommenderType, rec.recommenderSubtype);
         const service = extractServiceName(rec.name || '', task.recommenderType);
         const location = extractLocation(rec.name || '') || task.location;
-        const uiCategory = getUICategory(task.recommenderType);
+        const uiCategory = getUICategory(task.recommenderType, rec.recommenderSubtype);
 
         const rawResource = rec.content?.operationGroups?.[0]?.operations?.[0]?.resource || '';
         const resourceName = extractResourceName(rawResource);
@@ -243,6 +260,62 @@ export async function getExpandedCostRecommendations(
   }
   await Promise.all(executing);
 
+  // Billing-account-scoped recommenders (Spend-Based Commitments).
+  // Resolved once per project; failures are non-fatal — most users won't have billing.viewer.
+  try {
+    const billingAccountName = await resolveBillingAccountForProject(projectId);
+    if (billingAccountName) {
+      for (const recommenderType of BILLING_ACCOUNT_RECOMMENDERS) {
+        try {
+          const parent = `${billingAccountName}/locations/global/recommenders/${recommenderType}`;
+          const [recs] = await client.listRecommendations({ parent });
+          for (const rec of recs as GCPRecommendation[]) {
+            const recId = rec.name || `gcp-rec-${idx++}`;
+            const monthlySavings = extractMonthlySavings(rec);
+            const recType = mapRecommenderType(recommenderType, rec.recommenderSubtype);
+            const service = extractServiceName(rec.name || '', recommenderType);
+            const location = extractLocation(rec.name || '') || 'global';
+            const uiCategory = getUICategory(recommenderType, rec.recommenderSubtype);
+            const rawResource = rec.content?.operationGroups?.[0]?.operations?.[0]?.resource || '';
+            const resourceName = extractResourceName(rawResource);
+            const actionDesc = buildActionDescription(recommenderType, rec, resourceName);
+
+            recommendations.push({
+              id: recId,
+              type: recType,
+              severity: mapPriority(rec.priority),
+              service,
+              description: rec.description || 'Spend-based commitment recommendation',
+              estimatedMonthlySavings: monthlySavings,
+              currency: 'USD',
+              actionRequired: actionDesc,
+              resourceId: resourceName || rawResource || undefined,
+              region: location,
+              category: uiCategory,
+            });
+            meta[recId] = {
+              source: 'recommender_api',
+              uiCategory,
+              recommenderType,
+              recommenderSubtype: rec.recommenderSubtype,
+              consoleUrl: `https://console.cloud.google.com/billing/${billingAccountName.split('/')[1]}/commitments`,
+            };
+          }
+        } catch (err: unknown) {
+          const e = err as { code?: number; status?: number; message?: string };
+          const code = e?.code || e?.status;
+          if (code !== 5 && code !== 404 && code !== 7 && code !== 403) {
+            errors.push(`${recommenderType}: ${e?.message || String(err)}`);
+          }
+        }
+      }
+    }
+  } catch (err: unknown) {
+    const e = err as { message?: string };
+    // Don't fail the whole flow if billing-account resolution fails
+    errors.push(`billing-account resolution failed: ${e?.message ?? String(err)}`);
+  }
+
   // Build byCategory aggregation
   const byCategory: Record<GCPCostCategory, { count: number; savings: number }> = {
     idle_resources: { count: 0, savings: 0 },
@@ -276,9 +349,14 @@ export async function getExpandedCostRecommendations(
 
 // ── Helper functions ──
 
-function getUICategory(recommenderType: string): GCPCostCategory {
-  if (recommenderType.includes('Idle') || recommenderType.includes('idle') ||
-      recommenderType === 'google.container.DiagnosisRecommender') return 'idle_resources';
+function getUICategory(recommenderType: string, subtype?: string): GCPCostCategory {
+  // GKE subtype-aware routing: WORKLOAD_OVERPROVISIONED + CLUSTER_OVERPROVISIONED → rightsizing; CLUSTER_IDLE → idle
+  if (recommenderType === 'google.container.DiagnosisRecommender') {
+    if (subtype === 'WORKLOAD_OVERPROVISIONED' || subtype === 'CLUSTER_OVERPROVISIONED') return 'rightsizing';
+    return 'idle_resources';
+  }
+  if (recommenderType === 'google.resourcemanager.projectUtilization.Recommender') return 'idle_resources';
+  if (recommenderType.includes('Idle') || recommenderType.includes('idle')) return 'idle_resources';
   if (recommenderType.includes('MachineType') || recommenderType.includes('Overprovisioned') ||
       recommenderType.includes('RightSize')) return 'rightsizing';
   if (recommenderType.includes('Commitment') || recommenderType.includes('commitment') ||
@@ -290,14 +368,19 @@ function mapRecommenderType(
   recommenderType: string,
   subtype?: string
 ): CostOptimizationRecommendation['type'] {
+  // GKE subtype-aware: OVERPROVISIONED variants are rightsizing, CLUSTER_IDLE is idle
+  if (recommenderType === 'google.container.DiagnosisRecommender') {
+    if (subtype === 'WORKLOAD_OVERPROVISIONED' || subtype === 'CLUSTER_OVERPROVISIONED') return 'rightsizing';
+    return 'idle_resource';
+  }
+  if (recommenderType === 'google.resourcemanager.projectUtilization.Recommender') return 'idle_resource';
   if (recommenderType.includes('Commitment') || recommenderType.includes('commitment') ||
       recommenderType.includes('capacityCommitments')) return 'commitment_coverage';
   if (recommenderType.includes('MachineType') || recommenderType.includes('Overprovisioned') ||
       recommenderType.includes('RightSize') || recommenderType.includes('instanceGroupManager')) return 'rightsizing';
   if (recommenderType.includes('Idle') || recommenderType.includes('idle')) return 'idle_resource';
-  if (recommenderType === 'google.container.DiagnosisRecommender') return 'idle_resource';
   if (recommenderType.includes('SoftDelete') || recommenderType.includes('PartitionCluster') ||
-      recommenderType.includes('CostRecommender')) return 'best_practice';
+      recommenderType.includes('AnywhereCache') || recommenderType.includes('CostRecommender')) return 'best_practice';
 
   // Fallback to subtype-based mapping
   if (!subtype) return 'idle_resource';
@@ -337,6 +420,8 @@ export function extractServiceName(name: string, recommenderType?: string): stri
   if (recommenderType?.includes('storage.bucket')) return 'Cloud Storage';
   if (recommenderType?.includes('cloudsql')) return 'Cloud SQL';
   if (recommenderType?.includes('container.Diagnosis')) return 'GKE';
+  if (recommenderType?.includes('resourcemanager.projectUtilization')) return 'Resource Manager';
+  if (recommenderType?.includes('cloudbilling.commitment.SpendBased')) return 'Cloud Billing (Spend-Based CUDs)';
   if (recommenderType?.includes('instanceGroupManager')) return 'Compute Engine (MIGs)';
   if (recommenderType?.includes('RightSize')) return 'Compute Engine (Reservations)';
   if (name.includes('compute.instance') || recommenderType?.includes('compute.instance')) return 'Compute Engine (VMs)';
@@ -393,6 +478,9 @@ function buildActionDescription(
   if (recommenderType.includes('commitment.UsageCommitmentRecommender')) {
     return `Purchase committed use discount${target}`;
   }
+  if (recommenderType.includes('cloudbilling.commitment.SpendBasedCommitmentRecommender')) {
+    return `Purchase spend-based commitment${target}`;
+  }
   if (recommenderType.includes('RightSizeResourceRecommender')) {
     return `Rightsize underutilized reservation${target}`;
   }
@@ -420,8 +508,19 @@ function buildActionDescription(
   if (recommenderType.includes('storage.bucket.SoftDelete')) {
     return `Adjust Cloud Storage soft-delete policy${target}`;
   }
-  if (recommenderType.includes('container.DiagnosisRecommender') && subtype === 'CLUSTER_IDLE') {
-    return `Delete idle GKE cluster${target}`;
+  if (recommenderType.includes('storage.bucket.AnywhereCache')) {
+    return `Configure Cloud Storage Anywhere Cache${target}`;
+  }
+  if (recommenderType.includes('container.DiagnosisRecommender')) {
+    if (subtype === 'CLUSTER_IDLE') return `Delete idle GKE cluster${target}`;
+    if (subtype === 'CLUSTER_OVERPROVISIONED') return `Rightsize overprovisioned GKE cluster${target}`;
+    if (subtype === 'WORKLOAD_OVERPROVISIONED') return `Rightsize overprovisioned GKE workload${target}`;
+    return `Review GKE diagnosis${target}`;
+  }
+  if (recommenderType.includes('resourcemanager.projectUtilization')) {
+    if (subtype === 'CLEANUP_PROJECT') return `Clean up unattended project${target}`;
+    if (subtype === 'RECLAIM_PROJECT') return `Reclaim unattended project${target}`;
+    return `Review unattended project${target}`;
   }
 
   return `Review recommendation in GCP Console${target}`;

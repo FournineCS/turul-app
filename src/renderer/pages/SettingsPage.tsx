@@ -9,6 +9,7 @@ import { useGCPProjectStore } from '../stores/gcpProjectStore';
 import { useToastStore } from '../stores/toastStore';
 import { useAuthStore } from '../stores/authStore';
 import type { AppSettings, AppTheme } from '../stores/settingsStore';
+import type { SccProbeResult } from '../../shared/types';
 import EnvironmentHealthCard from '../components/settings/EnvironmentHealthCard';
 
 const COMMON_SERVICES: { id: string; name: string }[] = [
@@ -41,6 +42,9 @@ const SettingsPage: React.FC = () => {
   const [gcpBQProject, setGcpBQProject] = useState('');
   const [gcpBQDataset, setGcpBQDataset] = useState('billing_export');
   const [gcpBQRegion, setGcpBQRegion] = useState('');
+  const [sccProbe, setSccProbe] = useState<SccProbeResult | null>(null);
+  const [sccProbing, setSccProbing] = useState(false);
+  const activeGcpProjectId = useGCPProjectStore((s) => s.selectedProjectId);
 
   useEffect(() => {
     loadSettings();
@@ -73,9 +77,43 @@ const SettingsPage: React.FC = () => {
       }
       // Clear cached CLI paths so resolvers pick up the new settings
       await window.electronAPI?.settings?.clearGcloudCache?.();
+      // Re-activate GCP credentials so the new SCC Project (quota_project_id)
+      // is written into the active credential file without a re-login.
+      await window.electronAPI?.settings?.reactivateGcpAuth?.();
       addToast('success', 'Settings saved successfully');
     } catch (err) {
       addToast('error', `Failed to save settings: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
+
+  const handleTestSccConnection = async () => {
+    const projectId = local.gcpSccProjectId.trim() || activeGcpProjectId || '';
+    if (!projectId) {
+      addToast('error', 'No GCP project selected and no Default SCC Project configured');
+      return;
+    }
+    setSccProbing(true);
+    setSccProbe(null);
+    try {
+      // Make sure the active credential file picks up the latest settings
+      // (quota project) before probing — same pattern as handleSave.
+      await saveAll(local);
+      await window.electronAPI?.settings?.reactivateGcpAuth?.();
+      const res = await window.electronAPI?.gcp?.security?.testConnection?.(projectId, {
+        orgId: local.gcpSccOrgId.trim() || undefined,
+      });
+      if (res?.success && res.data) {
+        setSccProbe(res.data);
+        addToast(res.data.ok ? 'success' : 'error', res.data.ok
+          ? `SCC reachable at ${res.data.parent}`
+          : `SCC probe failed: ${res.data.error?.grpcCodeName ?? 'UNKNOWN'}`);
+      } else {
+        addToast('error', `Probe IPC failed: ${res?.error ?? 'no response'}`);
+      }
+    } catch (err) {
+      addToast('error', `Probe error: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setSccProbing(false);
     }
   };
 
@@ -287,6 +325,67 @@ const SettingsPage: React.FC = () => {
               <p className="text-secondary text-sm" style={{ marginTop: 4 }}>
                 The region where your BigQuery billing dataset is located. Set this if you get "Cannot parse as CloudRegion" errors.
               </p>
+            </div>
+
+            <div style={{ marginTop: 24, paddingTop: 16, borderTop: '1px solid var(--color-border)' }}>
+              <label className="form-label">Default Security Command Center Project</label>
+              <input
+                type="text"
+                className="form-input"
+                value={local.gcpSccProjectId}
+                onChange={(e) => setLocal((prev) => ({ ...prev, gcpSccProjectId: e.target.value }))}
+                placeholder="scc-host-project-id"
+                style={{ maxWidth: 400 }}
+              />
+              <p className="text-secondary text-sm" style={{ marginTop: 4 }}>
+                The GCP project SCC scans will run against. Used as both the parent project and the ADC quota project (required for <code>securitycenter.googleapis.com</code> with user credentials). Leave empty to fall back to the active project.
+              </p>
+            </div>
+
+            <div style={{ marginTop: 16 }}>
+              <label className="form-label">Default SCC Organization ID</label>
+              <input
+                type="text"
+                className="form-input"
+                value={local.gcpSccOrgId}
+                onChange={(e) => setLocal((prev) => ({ ...prev, gcpSccOrgId: e.target.value }))}
+                placeholder="123456789012 (auto-detect if blank)"
+                style={{ maxWidth: 400 }}
+              />
+              <p className="text-secondary text-sm" style={{ marginTop: 4 }}>
+                Numeric organization id (no <code>organizations/</code> prefix). When set, SCC posture queries run against <code>organizations/{'{'}id{'}'}/sources/-</code> and filter to the active project — required when SCC is activated only at the org level (typical for Premium/Enterprise tiers). Leave empty to auto-detect via Resource Manager ancestry.
+              </p>
+            </div>
+
+            <div style={{ marginTop: 16 }}>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={handleTestSccConnection}
+                disabled={sccProbing}
+              >
+                {sccProbing ? 'Testing…' : 'Test SCC Connection'}
+              </button>
+              <p className="text-secondary text-sm" style={{ marginTop: 4 }}>
+                Saves current settings, re-activates GCP credentials, then runs a single <code>listFindings(pageSize=1)</code> probe and shows the raw outcome below — including the actual gRPC status code and the resource path that was queried.
+              </p>
+              {sccProbe && (
+                <pre
+                  style={{
+                    marginTop: 12,
+                    padding: 12,
+                    background: 'var(--color-bg-tertiary)',
+                    border: `1px solid ${sccProbe.ok ? 'var(--color-success)' : 'var(--color-error)'}`,
+                    borderRadius: 4,
+                    fontSize: 12,
+                    overflowX: 'auto',
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-word',
+                  }}
+                >
+                  {JSON.stringify(sccProbe, null, 2)}
+                </pre>
+              )}
             </div>
           </div>
         )}

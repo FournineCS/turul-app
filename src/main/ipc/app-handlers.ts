@@ -143,6 +143,8 @@ export function registerAppHandlers(dbManager: DatabaseManager, authService: Aut
         'app.defaultServices',
         'app.dataRetentionDays',
         'app.gcloudPath',
+        'app.gcpSccProjectId',
+        'app.gcpSccOrgId',
       ];
       const result: Record<string, string> = {};
       for (const key of keys) {
@@ -162,6 +164,20 @@ export function registerAppHandlers(dbManager: DatabaseManager, authService: Aut
       return { success: true, data: undefined };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Failed to clear cache' };
+    }
+  });
+
+  // Re-activate the active GCP account so credential-file overrides
+  // (e.g. quota_project_id from Settings → "Default SCC Project") take effect
+  // without requiring the user to log out and back in.
+  ipcMain.handle('gcp:auth:reactivate', async (): Promise<IpcResponse<{ reactivated: boolean }>> => {
+    try {
+      requireAuth();
+      const { reactivateActiveAccount } = await import('../gcp/auth-factory');
+      const ok = reactivateActiveAccount();
+      return { success: true, data: { reactivated: ok } };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to reactivate' };
     }
   });
 

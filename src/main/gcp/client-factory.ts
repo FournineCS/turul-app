@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-present Fournine Cloud
 
-import { GoogleAuth } from 'google-auth-library';
-
 // Import GCP client types
 import {
   InstancesClient,
@@ -36,6 +34,7 @@ import { AssetServiceClient } from '@google-cloud/asset';
 import { Logging } from '@google-cloud/logging';
 import { AlertPolicyServiceClient, UptimeCheckServiceClient } from '@google-cloud/monitoring';
 import { CloudBillingClient } from '@google-cloud/billing';
+import { BudgetServiceClient } from '@google-cloud/billing-budgets';
 import { RecommenderClient } from '@google-cloud/recommender';
 import { ArtifactRegistryClient } from '@google-cloud/artifact-registry';
 import { CloudBuildClient } from '@google-cloud/cloudbuild';
@@ -181,8 +180,16 @@ export class GCPClientFactory {
   }
 
   // Security Command Center
-  getSecurityCenterClient(): SecurityCenterClient {
-    return this.getOrCreate('securityCenter', () => new SecurityCenterClient());
+  // ADC user creds require quota_project to be set on the AuthClient itself
+  // (clientOptions.quotaProjectId is silently ignored for UserRefreshClient).
+  // See gcp/security/scc-client.ts for the full rationale.
+  async getSecurityCenterClient(): Promise<SecurityCenterClient> {
+    const cached = this.clientCache.get('securityCenter') as SecurityCenterClient | undefined;
+    if (cached) return cached;
+    const { createSecurityCenterClient } = await import('./security/scc-client');
+    const client = await createSecurityCenterClient(this.projectId);
+    this.clientCache.set('securityCenter', client);
+    return client;
   }
 
   // Cloud Asset Inventory
@@ -206,6 +213,11 @@ export class GCPClientFactory {
   // Billing
   getBillingClient(): CloudBillingClient {
     return this.getOrCreate('billing', () => new CloudBillingClient());
+  }
+
+  // Billing Budgets
+  getBudgetServiceClient(): BudgetServiceClient {
+    return this.getOrCreate('budgetService', () => new BudgetServiceClient());
   }
 
   // Recommender

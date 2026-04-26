@@ -7,9 +7,10 @@ import { useCostStore } from '../stores/costStore';
 import { useGCPOptimizationStore } from '../stores/gcpOptimizationStore';
 import { GCPRecommendationsPanel } from '../components/costs/GCPRecommendationsPanel';
 import { IdleResourcePanel } from '../components/costs/IdleResourcePanel';
+import GCPInsightsPanel from '../components/costs/GCPInsightsPanel';
 
 type OptScope = 'project' | 'org';
-type PageTab = 'live' | 'resources' | 'history';
+type PageTab = 'live' | 'resources' | 'insights' | 'history';
 
 const ScopeToggle: React.FC<{ value: OptScope; onChange: (s: OptScope) => void }> = ({ value, onChange }) => {
   const btnStyle = (active: boolean): React.CSSProperties => ({
@@ -253,6 +254,11 @@ const GCPOptimizationPage: React.FC = () => {
                 </span>
               )}
             </button>
+            {scope === 'project' && (
+              <button style={tabStyle(activeTab === 'insights')} onClick={() => setActiveTab('insights')}>
+                Insights
+              </button>
+            )}
             <button style={tabStyle(activeTab === 'history')} onClick={() => setActiveTab('history')}>
               History
               {snapshots.length > 0 && (
@@ -290,6 +296,25 @@ const GCPOptimizationPage: React.FC = () => {
                 isLoading={resourceFindingsLoading}
                 error={resourceFindingsError}
               />
+            </div>
+          )}
+
+          {activeTab === 'insights' && scope === 'project' && (
+            <div
+              style={{
+                backgroundColor: 'var(--color-bg-secondary)',
+                border: '1px solid var(--color-border)',
+                borderRadius: 8,
+                padding: 20,
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <h3 style={{ margin: 0, fontSize: 16 }}>Diagnostic Insights</h3>
+                <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
+                  Cloud SQL utilization · BigQuery table stats · project utilization
+                </span>
+              </div>
+              <GCPInsightsPanel projectId={selectedProjectId} />
             </div>
           )}
 
