@@ -22,6 +22,41 @@ function assertSafeGcloudPath(binPath: string): void {
   }
 }
 
+/**
+ * Capture the user's gcloud default project (`gcloud config get-value project`)
+ * scoped to the isolated config directory used during login. Returns undefined
+ * if no default is set or the command fails.
+ */
+function captureGcloudProject(gcloudBin: string, configDir: string): Promise<string | undefined> {
+  return new Promise((resolve) => {
+    try {
+      const child = spawn(
+        gcloudBin,
+        ['config', 'get-value', 'project', '--quiet'],
+        {
+          stdio: ['ignore', 'pipe', 'pipe'],
+          env: { ...process.env, CLOUDSDK_CONFIG: configDir },
+          ...(process.platform === 'win32' ? { shell: true } : {}),
+        },
+      );
+      let stdout = '';
+      child.stdout?.on('data', (chunk: Buffer) => { stdout += chunk.toString('utf8'); });
+      child.on('close', (code) => {
+        if (code !== 0) return resolve(undefined);
+        const project = stdout.trim();
+        // gcloud emits "(unset)" when no project is set
+        if (!project || project === '(unset)') return resolve(undefined);
+        resolve(project);
+      });
+      child.on('error', () => resolve(undefined));
+      // Bound the wait — config get-value is normally instant
+      setTimeout(() => { try { child.kill(); } catch { /* ignore */ } resolve(undefined); }, 5_000);
+    } catch {
+      resolve(undefined);
+    }
+  });
+}
+
 let authInstance: GCPAuthManager | null = null;
 
 export class GCPAuthManager {
@@ -103,19 +138,30 @@ export class GCPAuthManager {
           resolve({ success: false, error: 'gcloud login timed out after 2 minutes' });
         }, TIMEOUT_MS);
 
-        child.on('close', (code) => {
+        child.on('close', async (code) => {
           clearTimeout(timer);
           if (code === 0) {
             // Read ADC from isolated temp dir
             const adcPath = path.join(tempConfigDir, 'application_default_credentials.json');
             try {
-              const adcJson = fs.readFileSync(adcPath, 'utf-8');
+              let adcJson = fs.readFileSync(adcPath, 'utf-8');
 
-              // Extract email from ADC if available
+              // Extract email + capture quota_project_id from gcloud default
+              // project. Without quota_project_id, UserRefreshClient does not
+              // send x-goog-user-project, and APIs like securitycenter and
+              // cloudresourcemanager reject the call with PERMISSION_DENIED.
+              // Settings → "Default SCC Project" can override later.
               let email: string | undefined;
               try {
                 const adc = JSON.parse(adcJson);
                 email = adc.client_email || adc.account || undefined;
+                if (!adc.quota_project_id) {
+                  const defaultProject = await captureGcloudProject(gcloudBin, tempConfigDir);
+                  if (defaultProject) {
+                    adc.quota_project_id = defaultProject;
+                    adcJson = JSON.stringify(adc);
+                  }
+                }
               } catch { /* ignore parse errors */ }
 
               // Encrypt and store

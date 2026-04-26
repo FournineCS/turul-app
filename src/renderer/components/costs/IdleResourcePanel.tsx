@@ -10,6 +10,11 @@ const ISSUE_LABELS: Record<IdleResourceIssueType, string> = {
   unattached_disk: 'Unattached Disk',
   unused_lb: 'Unused Load Balancer',
   empty_dns_zone: 'Empty DNS Zone',
+  idle_vertex_endpoint: 'Idle Vertex AI Endpoint',
+  errored_composer_env: 'Composer Env (ERROR)',
+  orphaned_forwarding_rule: 'Orphaned Forwarding Rule',
+  orphaned_pubsub_topic: 'Orphaned Pub/Sub Topic',
+  orphaned_pubsub_subscription: 'Orphaned Pub/Sub Subscription',
 };
 
 const ISSUE_COLORS: Record<IdleResourceIssueType, string> = {
@@ -18,6 +23,11 @@ const ISSUE_COLORS: Record<IdleResourceIssueType, string> = {
   unattached_disk: '#8b5cf6',
   unused_lb: '#ef4444',
   empty_dns_zone: '#6b7280',
+  idle_vertex_endpoint: '#ef4444',
+  errored_composer_env: '#ef4444',
+  orphaned_forwarding_rule: '#f59e0b',
+  orphaned_pubsub_topic: '#6b7280',
+  orphaned_pubsub_subscription: '#6b7280',
 };
 
 interface Props {
@@ -81,7 +91,16 @@ export const IdleResourcePanel: React.FC<Props> = ({ data, isLoading, error, las
   }
 
   const issueTypes: IdleResourceIssueType[] = [
-    'stopped_vm', 'unused_ip', 'unattached_disk', 'unused_lb', 'empty_dns_zone',
+    'stopped_vm',
+    'unused_ip',
+    'unattached_disk',
+    'unused_lb',
+    'empty_dns_zone',
+    'idle_vertex_endpoint',
+    'errored_composer_env',
+    'orphaned_forwarding_rule',
+    'orphaned_pubsub_topic',
+    'orphaned_pubsub_subscription',
   ];
 
   return (

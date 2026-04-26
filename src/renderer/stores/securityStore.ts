@@ -33,7 +33,7 @@ interface SecurityState {
   loadSecurityPosture: (profileName: string, region?: string) => Promise<void>;
   loadFindingDetails: (profileName: string, findingId: string, region?: string) => Promise<void>;
   runBestPracticesScan: (profileName: string, region?: string) => Promise<void>;
-  loadGCPSecurityPosture: (projectId: string) => Promise<void>;
+  loadGCPSecurityPosture: (projectId: string, options?: { orgId?: string }) => Promise<void>;
   runGCPBestPractices: (projectId: string) => Promise<void>;
   loadGCPHistory: (projectId: string) => Promise<void>;
   loadGCPScanById: (id: string) => Promise<void>;
@@ -186,7 +186,7 @@ export const useSecurityStore = create<SecurityState>((set, get) => ({
     }
   },
 
-  loadGCPSecurityPosture: async (projectId) => {
+  loadGCPSecurityPosture: async (projectId, options) => {
     if (!window.electronAPI?.gcp?.security?.getPosture) {
       set({ error: 'GCP security API not available', isLoading: false });
       return;
@@ -195,7 +195,7 @@ export const useSecurityStore = create<SecurityState>((set, get) => ({
     set({ isLoading: true, error: null });
 
     try {
-      const response = await window.electronAPI.gcp.security.getPosture(projectId);
+      const response = await window.electronAPI.gcp.security.getPosture(projectId, options);
       if (!response.success) {
         set({ error: response.error || 'Failed to start GCP security posture load', isLoading: false });
       }

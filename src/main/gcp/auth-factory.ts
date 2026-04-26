@@ -6,17 +6,42 @@ import path from 'path';
 import os from 'os';
 import { GoogleAuth } from 'google-auth-library';
 import type { GCPCredentialManager } from './credential-manager';
+import type { DatabaseManager } from '../database/db-manager';
 
 const SCOPES = ['https://www.googleapis.com/auth/cloud-platform'];
 
 let activeAccountId: string | null = null;
 let activeAuth: GoogleAuth | null = null;
 let credentialManagerRef: GCPCredentialManager | null = null;
+let dbManagerRef: DatabaseManager | null = null;
 let activeTempCredFile: string | null = null;
 
 /** Set the credential manager reference (called once at app startup) */
 export function setGCPCredentialManagerRef(cm: GCPCredentialManager): void {
   credentialManagerRef = cm;
+}
+
+/**
+ * Set the DatabaseManager reference (called once at app startup).
+ * Used to read the user-configured quota project from app settings.
+ */
+export function setGCPDbManagerRef(db: DatabaseManager): void {
+  dbManagerRef = db;
+}
+
+/**
+ * Resolve the quota project to inject into the credential file:
+ *   1. Settings → "Default Security Command Center Project" override
+ *   2. The credential JSON's existing quota_project_id (set at login from
+ *      the user's gcloud default project)
+ *   3. undefined — UserRefreshClient will not send x-goog-user-project,
+ *      and SCC will reject the call with PERMISSION_DENIED.
+ */
+function resolveQuotaProjectId(creds: Record<string, unknown>): string | undefined {
+  const fromSettings = dbManagerRef?.getSetting('app.gcpSccProjectId') || undefined;
+  if (fromSettings && fromSettings.trim()) return fromSettings.trim();
+  const fromCreds = typeof creds.quota_project_id === 'string' ? creds.quota_project_id : undefined;
+  return fromCreds || undefined;
 }
 
 /** Set the active GCP account (forces re-creation of GoogleAuth on next call) */
@@ -44,14 +69,35 @@ function activateCredentialsForAccount(accountId: string): void {
     return;
   }
 
+  // Inject quota_project_id into the credential JSON. UserRefreshClient
+  // (gcloud-issued ADC) reads this field and uses it for the
+  // x-goog-user-project header — required by securitycenter.googleapis.com
+  // and other APIs that bill quota separately.
+  const quotaProjectId = resolveQuotaProjectId(creds);
+  const credsWithQuota: Record<string, unknown> = quotaProjectId
+    ? { ...creds, quota_project_id: quotaProjectId }
+    : creds;
+
   // Write to temp file with restricted permissions
   const tempDir = path.join(os.tmpdir(), 'turul-gcp-creds');
   fs.mkdirSync(tempDir, { recursive: true, mode: 0o700 });
   const tempFile = path.join(tempDir, `${accountId}.json`);
-  fs.writeFileSync(tempFile, JSON.stringify(creds), { encoding: 'utf-8', mode: 0o600 });
+  fs.writeFileSync(tempFile, JSON.stringify(credsWithQuota), { encoding: 'utf-8', mode: 0o600 });
 
   activeTempCredFile = tempFile;
   process.env.GOOGLE_APPLICATION_CREDENTIALS = tempFile;
+}
+
+/**
+ * Re-activate the currently active account. Use after the user changes
+ * settings that affect the credential file (e.g. quota project) so the
+ * change takes effect without a re-login.
+ */
+export function reactivateActiveAccount(): boolean {
+  if (!activeAccountId) return false;
+  activeAuth = null;
+  activateCredentialsForAccount(activeAccountId);
+  return !!process.env.GOOGLE_APPLICATION_CREDENTIALS;
 }
 
 /**

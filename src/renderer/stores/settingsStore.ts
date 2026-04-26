@@ -12,6 +12,8 @@ export interface AppSettings {
   defaultServices: string[];
   dataRetentionDays: number;
   gcloudPath: string;
+  gcpSccProjectId: string;
+  gcpSccOrgId: string;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -21,6 +23,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   defaultServices: ['ec2'],
   dataRetentionDays: 90,
   gcloudPath: '',
+  gcpSccProjectId: '',
+  gcpSccOrgId: '',
 };
 
 interface SettingsState {
@@ -95,6 +99,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           defaultServices: d['app.defaultServices'] ? JSON.parse(d['app.defaultServices']) : ['ec2'],
           dataRetentionDays: d['app.dataRetentionDays'] ? parseInt(d['app.dataRetentionDays'], 10) : 90,
           gcloudPath: d['app.gcloudPath'] || '',
+          gcpSccProjectId: d['app.gcpSccProjectId'] || '',
+          gcpSccOrgId: d['app.gcpSccOrgId'] || '',
         };
         applyTheme(s.theme);
         set({ settings: s, isLoading: false });
@@ -136,6 +142,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         ['app.defaultServices', JSON.stringify(settings.defaultServices)],
         ['app.dataRetentionDays', String(settings.dataRetentionDays)],
         ['app.gcloudPath', settings.gcloudPath],
+        ['app.gcpSccProjectId', settings.gcpSccProjectId],
+        ['app.gcpSccOrgId', settings.gcpSccOrgId],
       ];
       for (const [k, v] of pairs) {
         const res = await window.electronAPI.settings.set(k, v);

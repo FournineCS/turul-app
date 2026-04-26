@@ -23,6 +23,19 @@ const DEFAULT_DISK_PRICE_PER_GB = 0.10;
 const IDLE_STATIC_IP_MONTHLY = 7.30;
 const IDLE_LB_MONTHLY = 18.00;
 const EMPTY_DNS_ZONE_MONTHLY = 0.20;
+// Conservative monthly cost estimates for new heuristics.
+// Vertex AI endpoints with no deployed models still incur a base cost via the
+// underlying resource pool; ~$0.50/hr for the smallest n1-standard-2 baseline ≈ $365/mo.
+const IDLE_VERTEX_ENDPOINT_MONTHLY = 365.00;
+// Composer 2 environments in ERROR state still bill for the GKE control plane,
+// Composer fee, and database — a small environment is ~$300/mo when stuck in ERROR.
+const ERRORED_COMPOSER_ENV_MONTHLY = 300.00;
+// Orphaned forwarding rules — internal/external regional rules ~$0.025/hr ≈ $18/mo.
+const ORPHANED_FORWARDING_RULE_MONTHLY = 18.00;
+// Pub/Sub: empty topics carry no charge, but message-retention dead letters could.
+// Use a low symbolic value to surface them without inflating savings totals.
+const ORPHANED_PUBSUB_TOPIC_MONTHLY = 0.50;
+const ORPHANED_PUBSUB_SUBSCRIPTION_MONTHLY = 0.50;
 
 function getDiskPrice(diskType: string): number {
   return DISK_PRICE_PER_GB[diskType] ?? DEFAULT_DISK_PRICE_PER_GB;
@@ -177,6 +190,124 @@ export async function analyzeIdleResources(
     });
   }
 
+  // ── 6. Vertex AI endpoints with no deployed models ──
+  const vertexEndpoints = dbManager.getResourcesByService(scanId, 'vertex-ai');
+  for (const res of vertexEndpoints) {
+    if (res.resourceType !== 'endpoint') continue;
+    const deployedModels = res.data.deployedModels;
+    const hasModels = Array.isArray(deployedModels) ? deployedModels.length > 0 : !!deployedModels;
+    if (hasModels) continue;
+
+    findings.push({
+      id: crypto.randomUUID(),
+      resourceId: res.id,
+      resourceName: res.name,
+      service: 'vertex-ai',
+      resourceType: 'endpoint',
+      region: res.region,
+      projectId: String(res.data.projectId ?? ''),
+      issueType: 'idle_vertex_endpoint',
+      description: 'Vertex AI endpoint has no deployed models — delete to stop incurring infrastructure cost',
+      estimatedMonthlySavings: IDLE_VERTEX_ENDPOINT_MONTHLY,
+      details: { createTime: res.data.createTime },
+    });
+  }
+
+  // ── 7. Composer environments stuck in ERROR state ──
+  const composerEnvs = dbManager.getResourcesByService(scanId, 'composer');
+  for (const res of composerEnvs) {
+    if (res.resourceType !== 'environment') continue;
+    const state = String(res.data.state ?? '').toUpperCase();
+    if (state !== 'ERROR') continue;
+
+    findings.push({
+      id: crypto.randomUUID(),
+      resourceId: res.id,
+      resourceName: res.name,
+      service: 'composer',
+      resourceType: 'environment',
+      region: res.region,
+      projectId: String(res.data.projectId ?? ''),
+      issueType: 'errored_composer_env',
+      description: 'Composer environment is stuck in ERROR state — recreate or delete to stop ongoing charges',
+      estimatedMonthlySavings: ERRORED_COMPOSER_ENV_MONTHLY,
+      details: { state, createTime: res.data.createTime },
+    });
+  }
+
+  // ── 8. Orphaned forwarding rules (no backend service / no target) ──
+  const forwardingRules = dbManager.getResourcesByService(scanId, 'gclb-url-maps')
+    .concat(dbManager.getResourcesByService(scanId, 'gclb'))
+    .concat(dbManager.getResourcesByService(scanId, 'cloud-address'));
+  for (const res of forwardingRules) {
+    if (res.resourceType !== 'forwarding-rule') continue;
+    const hasBackend = !!(res.data.backendService || res.data.target || res.data.targetService);
+    if (hasBackend) continue;
+
+    findings.push({
+      id: crypto.randomUUID(),
+      resourceId: res.id,
+      resourceName: res.name,
+      service: String(res.service ?? 'gclb'),
+      resourceType: 'forwarding-rule',
+      region: res.region,
+      projectId: String(res.data.projectId ?? ''),
+      issueType: 'orphaned_forwarding_rule',
+      description: 'Forwarding rule has no backend service or target — delete to stop the per-rule monthly fee',
+      estimatedMonthlySavings: ORPHANED_FORWARDING_RULE_MONTHLY,
+      details: { ipAddress: res.data.IPAddress ?? res.data.ipAddress },
+    });
+  }
+
+  // ── 9. Pub/Sub topics with no subscriptions ──
+  const pubsubResources = dbManager.getResourcesByService(scanId, 'pubsub');
+  const subscribedTopicNames = new Set<string>();
+  for (const res of pubsubResources) {
+    if (res.resourceType !== 'subscription') continue;
+    const topicRef = String(res.data.topic ?? '');
+    if (topicRef) subscribedTopicNames.add(topicRef);
+  }
+  for (const res of pubsubResources) {
+    if (res.resourceType !== 'topic') continue;
+    if (subscribedTopicNames.has(res.id)) continue;
+
+    findings.push({
+      id: crypto.randomUUID(),
+      resourceId: res.id,
+      resourceName: res.name,
+      service: 'pubsub',
+      resourceType: 'topic',
+      region: res.region,
+      projectId: String(res.data.projectId ?? ''),
+      issueType: 'orphaned_pubsub_topic',
+      description: 'Pub/Sub topic has no subscriptions — likely abandoned; review and delete',
+      estimatedMonthlySavings: ORPHANED_PUBSUB_TOPIC_MONTHLY,
+      details: {},
+    });
+  }
+
+  // ── 10. Pub/Sub subscriptions whose topic is "_deleted-topic_" ──
+  for (const res of pubsubResources) {
+    if (res.resourceType !== 'subscription') continue;
+    const topicRef = String(res.data.topic ?? '');
+    // GCP marks subs whose topic was deleted with the literal "_deleted-topic_"
+    if (!topicRef.includes('_deleted-topic_')) continue;
+
+    findings.push({
+      id: crypto.randomUUID(),
+      resourceId: res.id,
+      resourceName: res.name,
+      service: 'pubsub',
+      resourceType: 'subscription',
+      region: res.region,
+      projectId: String(res.data.projectId ?? ''),
+      issueType: 'orphaned_pubsub_subscription',
+      description: 'Pub/Sub subscription points to a deleted topic — message retention may still incur cost',
+      estimatedMonthlySavings: ORPHANED_PUBSUB_SUBSCRIPTION_MONTHLY,
+      details: { topic: topicRef },
+    });
+  }
+
   findings.sort((a, b) => b.estimatedMonthlySavings - a.estimatedMonthlySavings);
 
   const byType: Record<IdleResourceIssueType, number> = {
@@ -185,6 +316,11 @@ export async function analyzeIdleResources(
     unattached_disk: 0,
     unused_lb: 0,
     empty_dns_zone: 0,
+    idle_vertex_endpoint: 0,
+    errored_composer_env: 0,
+    orphaned_forwarding_rule: 0,
+    orphaned_pubsub_topic: 0,
+    orphaned_pubsub_subscription: 0,
   };
   for (const f of findings) byType[f.issueType]++;
 

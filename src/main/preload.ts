@@ -22,7 +22,13 @@ import type {
   GCPCostBestPracticesResult,
   GCPCUDCoverageResult,
   StoppedVMResult,
+  GCPBudget,
+  GCPBudgetListResult,
+  GCPCostAnomalyOptions,
+  GCPCostAnomalyResult,
+  GCPCostInsightResult,
   SecurityAnalysisResult,
+  SccProbeResult,
   SecurityFinding,
   WAAnalysisResult,
   WAWorkloadSummary,
@@ -461,6 +467,8 @@ const electronAPI = {
       ipcRenderer.invoke('settings:get-all-app'),
     clearGcloudCache: (): Promise<void> =>
       ipcRenderer.invoke('settings:clear-gcloud-cache'),
+    reactivateGcpAuth: (): Promise<IpcResponse<{ reactivated: boolean }>> =>
+      ipcRenderer.invoke('gcp:auth:reactivate'),
   },
 
   // Tag Governance
@@ -552,6 +560,22 @@ const electronAPI = {
         ipcRenderer.invoke('gcp:cost:get-best-practices', projectId, bqProject, bqDataset),
       getCUDCoverage: (projectId: string, bqProject?: string, bqDataset?: string): Promise<IpcResponse<GCPCUDCoverageResult>> =>
         ipcRenderer.invoke('gcp:cost:get-cud-coverage', projectId, bqProject, bqDataset),
+      resolveBillingAccount: (projectId: string): Promise<IpcResponse<{ billingAccountName: string | null }>> =>
+        ipcRenderer.invoke('gcp:cost:resolve-billing-account', projectId),
+      listBudgets: (projectId: string, billingAccountName: string): Promise<IpcResponse<GCPBudgetListResult>> =>
+        ipcRenderer.invoke('gcp:cost:list-budgets', projectId, billingAccountName),
+      getBudget: (projectId: string, budgetName: string): Promise<IpcResponse<GCPBudget | null>> =>
+        ipcRenderer.invoke('gcp:cost:get-budget', projectId, budgetName),
+      detectAnomalies: (
+        projectId: string,
+        bqProject: string,
+        bqDataset: string,
+        bqRegion?: string,
+        options?: GCPCostAnomalyOptions
+      ): Promise<IpcResponse<GCPCostAnomalyResult>> =>
+        ipcRenderer.invoke('gcp:cost:detect-anomalies', projectId, bqProject, bqDataset, bqRegion, options),
+      getInsights: (projectId: string): Promise<IpcResponse<GCPCostInsightResult>> =>
+        ipcRenderer.invoke('gcp:cost:get-insights', projectId),
       getStoppedVMs: (projectId: string): Promise<IpcResponse<StoppedVMResult>> =>
         ipcRenderer.invoke('gcp:cost:get-stopped-vms', projectId),
       getStoppedVMsOrg: (orgId: string): Promise<IpcResponse<StoppedVMResult>> =>
@@ -625,8 +649,16 @@ const electronAPI = {
         ipcRenderer.invoke('gcp:cost:get-org-credits', startDate, endDate, bqProject, bqDataset, bqRegion),
     },
     security: {
-      getPosture: (projectId: string): Promise<IpcResponse<{ started: boolean }>> =>
-        ipcRenderer.invoke('gcp:security:get-posture', projectId),
+      getPosture: (
+        projectId: string,
+        options?: { orgId?: string },
+      ): Promise<IpcResponse<{ started: boolean }>> =>
+        ipcRenderer.invoke('gcp:security:get-posture', projectId, options),
+      testConnection: (
+        projectId: string,
+        options?: { orgId?: string },
+      ): Promise<IpcResponse<SccProbeResult>> =>
+        ipcRenderer.invoke('gcp:security:test-connection', projectId, options),
       runBestPractices: (projectId: string): Promise<IpcResponse<{ started: boolean }>> =>
         ipcRenderer.invoke('gcp:security:run-best-practices', projectId),
       getAll: (projectId?: string, limit?: number): Promise<IpcResponse<GCPSecurityScanSummary[]>> =>

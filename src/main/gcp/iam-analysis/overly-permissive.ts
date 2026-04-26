@@ -8,15 +8,23 @@ import { GCPOverlyPermissiveBinding } from './types';
 // Primitive roles that grant overly broad access
 const PRIMITIVE_ROLES = ['roles/owner', 'roles/editor'];
 
-// Predefined roles that grant admin-level access to sensitive services
+// Predefined roles that grant admin-level access to sensitive services.
+// Token Creator / Service Account User are flagged at project scope per CIS GCP §1.6:
+// granting them at the project level lets the principal impersonate every SA in the project.
 const BROAD_PREDEFINED_ROLES = [
   'roles/iam.securityAdmin',
   'roles/iam.serviceAccountAdmin',
   'roles/iam.serviceAccountKeyAdmin',
+  'roles/iam.serviceAccountTokenCreator',
+  'roles/iam.serviceAccountUser',
+  'roles/iam.workloadIdentityUser',
   'roles/storage.admin',
   'roles/compute.admin',
   'roles/cloudsql.admin',
   'roles/bigquery.admin',
+  'roles/cloudkms.admin',
+  'roles/secretmanager.admin',
+  'roles/resourcemanager.projectIamAdmin',
 ];
 
 export async function findOverlyPermissiveBindings(projectId: string): Promise<GCPOverlyPermissiveBinding[]> {
