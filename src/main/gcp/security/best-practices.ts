@@ -492,7 +492,7 @@ async function checkComputeInstances(
           const isDefault =
             sa.email?.endsWith('@developer.gserviceaccount.com') ||
             sa.email?.endsWith('@appspot.gserviceaccount.com');
-          const hasFullScope = (sa.scopes || []).includes(FULL_SCOPE);
+          const hasFullScope = !!sa.scopes?.some((s) => s === FULL_SCOPE);
           if (isDefault && hasFullScope) {
             findings.push(createFinding(
               `gce-default-sa-fullscope-${inst.name}`,
