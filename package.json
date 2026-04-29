@@ -37,7 +37,7 @@
   "author": "Fournine Cloud <info@fourninecloud.com>",
   "license": "Apache-2.0",
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.87.0",
+    "@anthropic-ai/sdk": "^0.91.1",
     "@aws-sdk/client-accessanalyzer": "^3.997.0",
     "@aws-sdk/client-acm": "^3.998.0",
     "@aws-sdk/client-amplify": "^3.999.0",
