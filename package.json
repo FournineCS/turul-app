@@ -288,7 +288,7 @@
     "protobufjs": "^7.2.5",
     "@grpc/grpc-js": "^1.8.22",
     "picomatch": "^4.0.4",
-    "brace-expansion": "^5.0.5",
+    "brace-expansion": "^5.0.6",
     "lodash": "^4.17.24",
     "@xmldom/xmldom": "^0.8.13",
     "@tootallnate/once": "^3.0.1"
